@@ -53,16 +53,26 @@ function adfToText(node) {
         return '\n';
     if (node.type === 'mention')
         return node.attrs?.text ?? '';
-    if (node.type === 'paragraph')
-        return `${adfToText(node.content)}\n`;
-    if (node.type === 'heading')
-        return `${adfToText(node.content)}\n`;
+    if (node.type === 'paragraph') {
+        return `${adfToText(node.content)}\n\n`;
+    }
+    if (node.type === 'heading') {
+        const level = node.attrs?.level ?? 1;
+        const prefix = '#'.repeat(level) + ' ';
+        return `\n${prefix}${adfToText(node.content)}\n\n`;
+    }
     if (node.type === 'bulletList' || node.type === 'orderedList') {
         const items = Array.isArray(node.content) ? node.content : [];
-        return items.map((item) => `• ${adfToText(item).trim()}`).join('\n') + '\n';
+        let bulletIndex = 1;
+        const formatted = items.map((item) => {
+            const bullet = node.type === 'orderedList' ? `${bulletIndex++}. ` : '• ';
+            return `${bullet}${adfToText(item).trim()}`;
+        }).join('\n');
+        return `\n${formatted}\n\n`;
     }
-    if (node.type === 'listItem')
+    if (node.type === 'listItem') {
         return `${adfToText(node.content)}`;
+    }
     return adfToText(node.content);
 }
 //# sourceMappingURL=jira.js.map
