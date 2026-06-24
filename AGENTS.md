@@ -45,6 +45,7 @@ src/
 ├── pr.ts                   — PR fetching facade
 ├── services/pr/            — GitHub/GitLab/Bitbucket PR API clients + shared helpers
 ├── config.ts               — Config/cache load/save, repo discovery, CLI resolution
+├── services/tasks/         — Jira task provider service (future task integrations)
 └── components/
     ├── TopBar.tsx          — Title bar: workspace, base→release, repo count, sync status
     ├── BottomBar.tsx       — k9s-style menu with per-view keybinding hints
@@ -53,7 +54,7 @@ src/
     ├── RepoList.tsx        — Repo list with auto-width columns
     ├── CommitsView.tsx     — Commit diff + latest-5 view with enter-to-detail
     ├── DetailView.tsx      — Single commit detail (hash, author, date, body, stat)
-    ├── ConfigView.tsx      — Config editor (workspace, base, release, syncInterval, token, provider)
+    ├── ConfigView.tsx      — Config editor (workspace, base, release, syncInterval, token, provider, taskProvider, jiraUrl, jiraEmail, jiraApiToken)
     ├── PRsView.tsx         — PR list with table, loading, error, empty states
     └── PRDetailView.tsx    — Single PR detail (state, author, branches, date, URL)
 ```
@@ -157,6 +158,8 @@ Format: ` ■ DeltaDot │ ~/workspace │ main → R10 │ 10 repos │ ◐ syn
 - Token from config used for `Bearer` auth header
 - PRsView shows: `#`, `TITLE`, `AGE`, `PR #`, `REPO`, `STATE`, `APRVD`, `BRANCH`, `AUTHOR`
 - Press `Enter` on a PR to see detail (state, author, branches, dates, URL)
+- Press `Shift+R` on a PR to open the review view with Jira task details + PR changes
+- Task provider config is global and currently supports a single active provider (Jira)
 
 ### Quit
 
@@ -168,7 +171,7 @@ Format: ` ■ DeltaDot │ ~/workspace │ main → R10 │ 10 repos │ ◐ syn
 - `/` opens search with live filtering (onChange updates `searchQuery`)
 - `:` opens command mode (onSubmit calls `execCommand`)
 - Tab in command mode: auto-completes to matching command (longest common prefix)
-- Config fields: `workspace`, `base`, `release`, `syncInterval`, `token`, `provider`
+- Config fields: `workspace`, `base`, `release`, `syncInterval`, `token`, `provider`, `taskProvider`, `jiraUrl`, `jiraEmail`, `jiraApiToken`
 
 ## Dashboard Views & Keys
 
@@ -177,6 +180,7 @@ Format: ` ■ DeltaDot │ ~/workspace │ main → R10 │ 10 repos │ ◐ syn
 | `list` | Repo table with status, diff, version, author, age, last commit | j/k/↑↓ g/G c s S e / : P o b q |
 | `commits` | DIFF section + LATEST 5 section with commit tables | ↑↓ j/k g/G Enter o s b/Esc q |
 | `detail` | Single commit details (hash, author, date, body, file stats) | b/Esc q |
-| `config` | Config editor (workspace, base, release, syncInterval, token, provider) | Tab ↑↓ Enter Esc q |
-| `prs` | PR list with table, loading, error, empty states | ↑↓ j/k g/G Enter o b/Esc q |
-| `prdetail` | Single PR detail (state, author, branches, date, URL) | o b/Esc q |
+| `config` | Config editor (workspace, base, release, syncInterval, token, provider, taskProvider) | Tab ↑↓ Enter Esc q |
+| `prs` | PR list with table, loading, error, empty states | ↑↓ j/k g/G Enter R o b/Esc q |
+| `prdetail` | Single PR detail (state, author, branches, date, URL) | R o b/Esc q |
+| `review` | Jira task + PR changes review view | j/k ↑↓ pageUp/pageDown o b/Esc q |

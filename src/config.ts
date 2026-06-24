@@ -82,9 +82,13 @@ export function resolveCliConfig(cliOpts: { path?: string; base?: string; releas
     base:         cliOpts.base         ?? savedCfg.base         ?? 'main',
     release:      cliOpts.release      ?? savedCfg.release      ?? 'R10',
     syncInterval: cliOpts.syncInterval ? parseFloat(cliOpts.syncInterval)
-                                       : (savedCfg.syncInterval ?? 30),
+                                        : (savedCfg.syncInterval ?? 30),
     token:        cliOpts.token        ?? savedCfg.token        ?? '',
     provider:     (cliOpts.provider    ?? savedCfg.provider     ?? 'github') as 'github' | 'gitlab' | 'bitbucket',
+    taskProvider: savedCfg.taskProvider ?? 'none',
+    jiraUrl:      savedCfg.jiraUrl      ?? '',
+    jiraEmail:    savedCfg.jiraEmail    ?? '',
+    jiraApiToken: savedCfg.jiraApiToken ?? '',
   };
 
   if (!existsSync(finalCfg.workspace)) {

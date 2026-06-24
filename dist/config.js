@@ -80,6 +80,10 @@ export function resolveCliConfig(cliOpts, savedCfg) {
             : (savedCfg.syncInterval ?? 30),
         token: cliOpts.token ?? savedCfg.token ?? '',
         provider: (cliOpts.provider ?? savedCfg.provider ?? 'github'),
+        taskProvider: savedCfg.taskProvider ?? 'none',
+        jiraUrl: savedCfg.jiraUrl ?? '',
+        jiraEmail: savedCfg.jiraEmail ?? '',
+        jiraApiToken: savedCfg.jiraApiToken ?? '',
     };
     if (!existsSync(finalCfg.workspace)) {
         console.error(`Error: workspace path does not exist — ${finalCfg.workspace}`);

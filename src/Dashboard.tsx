@@ -2,12 +2,13 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Box, Text, useInput, useStdout } from 'ink';
 import { resolve } from 'path';
 import { existsSync, statSync } from 'fs';
-import type { View, AppConfig, RepoState, CommitDetail, ConfigField, InputMode, PR, Provider, PRDetail } from './types.js';
-import { CONFIG_FIELDS } from './types.js';
+import type { View, AppConfig, RepoState, CommitDetail, ConfigField, InputMode, PR, Provider, PRDetail, JiraIssue } from './types.js';
+import { getVisibleConfigFields } from './types.js';
 import { analyzeRepo, fetchCommitDetail } from './git.js';
 import { getRemoteUrl, getCommitUrl, getCompareUrl, openInBrowser } from './remote.js';
 import { getRemoteOwnerRepo, fetchPRs, fetchPRDetail } from './pr.js';
 import { findGitRepos, saveCache, saveGlobalConfig } from './config.js';
+import { fetchJiraIssue, extractJiraIssueKey } from './services/tasks/jira.js';
 import { TopBar } from './components/TopBar.js';
 import { BottomBar } from './components/BottomBar.js';
 import { CommandBar } from './components/CommandBar.js';
@@ -17,6 +18,7 @@ import { DetailView } from './components/DetailView.js';
 import { ConfigView } from './components/ConfigView.js';
 import { PRsView } from './components/PRsView.js';
 import { PRDetailView } from './components/PRDetailView.js';
+import { ReviewView } from './components/ReviewView.js';
 
 export function Dashboard({ initialConfig, initialRepos, initialLastSync, initialPRs = [] }: {
   initialConfig: AppConfig;
@@ -66,6 +68,20 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
   const [prDetailError, setPRDetailError] = useState('');
   const [prDescriptionScroll, setPRDescriptionScroll] = useState(0);
 
+  const prDetailRef = useRef(prDetail);
+  useEffect(() => { prDetailRef.current = prDetail; }, [prDetail]);
+
+  const [reviewContext, setReviewContext] = useState<{ repoPath: string; prNumber: number; fallbackPR: PR | null; returnView: 'prs' | 'prdetail'; }>({
+    repoPath: '',
+    prNumber: 0,
+    fallbackPR: null,
+    returnView: 'prs',
+  });
+  const [reviewJira, setReviewJira] = useState<JiraIssue | null>(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewError, setReviewError] = useState('');
+  const [reviewDescriptionScroll, setReviewDescriptionScroll] = useState(0);
+
   // ── config editing state
   const [configDraft, setConfigDraft]   = useState<Record<ConfigField, string>>({
     workspace:    initialConfig.workspace,
@@ -74,6 +90,10 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
     syncInterval: String(initialConfig.syncInterval),
     token:        initialConfig.token,
     provider:     initialConfig.provider,
+    taskProvider: initialConfig.taskProvider,
+    jiraUrl:      initialConfig.jiraUrl,
+    jiraEmail:    initialConfig.jiraEmail,
+    jiraApiToken: initialConfig.jiraApiToken,
   });
   const [configFocus, setConfigFocus]   = useState<ConfigField>('workspace');
   const [configError, setConfigError]   = useState('');
@@ -91,6 +111,7 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
     .map((r) => r.name);
 
   const normalizedSearch = searchQuery.trim().toLowerCase();
+  const visibleConfigFields = getVisibleConfigFields((configDraft.taskProvider || 'none') as AppConfig['taskProvider']);
 
   const sortedPRs = [...prs].sort((a, b) => dateValue(b.createdAt) - dateValue(a.createdAt));
 
@@ -269,22 +290,76 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
     saveCache({ workspace, base, release, lastFullSync: now, repos: reposRef.current, prs: finalPRs });
   }, []);
 
-  const fetchPRDetailForRepo = useCallback(async (repoPath: string, prNumber: number) => {
+  const fetchPRDetailForRepo = useCallback(async (repoPath: string, prNumber: number): Promise<PRDetail | null> => {
     setPRDetailLoading(true);
     setPRDetailError('');
     try {
       const orr = await getRemoteOwnerRepo(repoPath);
-      if (!orr) { setPRDetailError('Could not parse remote URL'); setPRDetailLoading(false); return; }
+      if (!orr) { setPRDetailError('Could not parse remote URL'); setPRDetailLoading(false); return null; }
       const provider = cfgRef.current.provider;
       const token = cfgRef.current.token;
       const result = await fetchPRDetail(orr.owner, orr.repo, prNumber, provider, token);
       const repoName = repoPath.split('/').pop() ?? '';
       setPRDetail({ ...result, repoName });
+      return { ...result, repoName };
     } catch (err: unknown) {
       setPRDetailError(err instanceof Error ? err.message : String(err));
+      return null;
     }
-    setPRDetailLoading(false);
+    finally {
+      setPRDetailLoading(false);
+    }
   }, []);
+
+  const loadReviewData = useCallback(async (repoPath: string, prNumber: number, fallbackPR: PR | null) => {
+    setReviewLoading(true);
+    setReviewError('');
+    setReviewJira(null);
+    setReviewDescriptionScroll(0);
+
+    try {
+      const currentDetail = prDetailRef.current;
+      const detail = currentDetail?.number === prNumber ? currentDetail : await fetchPRDetailForRepo(repoPath, prNumber);
+      if (!detail) {
+        setReviewError('Unable to load PR details.');
+        return;
+      }
+      const prMeta = fallbackPR ?? null;
+      const jiraKey = extractJiraIssueKey(
+        prMeta?.title,
+        prMeta?.sourceBranch,
+        detail?.title,
+        detail?.sourceBranch,
+        detail?.description,
+      );
+
+      if (cfgRef.current.taskProvider !== 'jira') {
+        setReviewError('Enable Jira in config to use review view.');
+        return;
+      }
+
+      if (!jiraKey) {
+        setReviewError('No Jira key found in PR title, branch, or description.');
+        return;
+      }
+
+      if (!cfgRef.current.jiraUrl || !cfgRef.current.jiraEmail || !cfgRef.current.jiraApiToken) {
+        setReviewError('Jira config is incomplete.');
+        return;
+      }
+
+      const jira = await fetchJiraIssue({
+        url: cfgRef.current.jiraUrl,
+        email: cfgRef.current.jiraEmail,
+        apiToken: cfgRef.current.jiraApiToken,
+      }, jiraKey);
+      setReviewJira(jira);
+    } catch (err: unknown) {
+      setReviewError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setReviewLoading(false);
+    }
+  }, [fetchPRDetailForRepo]);
 
   useEffect(() => {
     const fromCache = initialRepos.some((r) => r.status === 'stale');
@@ -320,6 +395,18 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
     }
   }, [view, visibleSelectedPR, repos, selectedRepo, fetchPRDetailForRepo, prDetail]);
 
+  useEffect(() => {
+    if (view === 'review' && reviewContext.repoPath && reviewContext.prNumber) {
+      void loadReviewData(reviewContext.repoPath, reviewContext.prNumber, reviewContext.fallbackPR);
+    }
+  }, [view, reviewContext, loadReviewData]);
+
+  useEffect(() => {
+    if (!visibleConfigFields.includes(configFocus)) {
+      setConfigFocus(visibleConfigFields[0] ?? 'workspace');
+    }
+  }, [visibleConfigFields, configFocus]);
+
   const applyConfig = useCallback(() => {
     const { workspace: ws, base, release, syncInterval: siStr } = configDraft;
     const si = parseFloat(siStr);
@@ -330,7 +417,27 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
     if (!base.trim()) { setConfigError('Base branch cannot be empty'); return; }
     if (!release.trim()) { setConfigError('Release branch cannot be empty'); return; }
     if (isNaN(si) || si < 1) { setConfigError('Sync interval must be a number ≥ 1'); return; }
-    const newCfg: AppConfig = { workspace: resolvedWs, base: base.trim(), release: release.trim(), syncInterval: si, token: configDraft.token ?? '', provider: (configDraft.provider ?? 'github') as Provider };
+    const taskProvider = (configDraft.taskProvider ?? 'none').trim();
+    if (!['none', 'jira', 'clickup', 'github'].includes(taskProvider)) {
+      setConfigError('Task provider must be none, jira, clickup, or github');
+      return;
+    }
+    if (taskProvider === 'jira' && (!configDraft.jiraUrl?.trim() || !configDraft.jiraEmail?.trim() || !configDraft.jiraApiToken?.trim())) {
+      setConfigError('Jira URL, email, and API token are required when Jira is enabled');
+      return;
+    }
+    const newCfg: AppConfig = {
+      workspace: resolvedWs,
+      base: base.trim(),
+      release: release.trim(),
+      syncInterval: si,
+      token: configDraft.token ?? '',
+      provider: (configDraft.provider ?? 'github') as Provider,
+      taskProvider: taskProvider as AppConfig['taskProvider'],
+      jiraUrl: configDraft.jiraUrl ?? '',
+      jiraEmail: configDraft.jiraEmail ?? '',
+      jiraApiToken: configDraft.jiraApiToken ?? '',
+    };
     setCfg(newCfg);
     cfgRef.current = newCfg;
     setConfigError('');
@@ -352,7 +459,7 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
   const execCommand = useCallback((cmd: string) => {
     const trimmed = cmd.trim().toLowerCase();
     if (!trimmed || trimmed === 'list') { setView('list'); return true; }
-    if (trimmed === 'config') { setConfigDraft({ workspace: cfgRef.current.workspace, base: cfgRef.current.base, release: cfgRef.current.release, syncInterval: String(cfgRef.current.syncInterval), token: cfgRef.current.token, provider: cfgRef.current.provider }); setConfigFocus('workspace'); setConfigError(''); setView('config'); return true; }
+    if (trimmed === 'config') { setConfigDraft({ workspace: cfgRef.current.workspace, base: cfgRef.current.base, release: cfgRef.current.release, syncInterval: String(cfgRef.current.syncInterval), token: cfgRef.current.token, provider: cfgRef.current.provider, taskProvider: cfgRef.current.taskProvider, jiraUrl: cfgRef.current.jiraUrl, jiraEmail: cfgRef.current.jiraEmail, jiraApiToken: cfgRef.current.jiraApiToken }); setConfigFocus('workspace'); setConfigError(''); setView('config'); return true; }
     if (trimmed === 'prs') { setView('prs'); return true; }
     if (trimmed === 'commits') { setView('commits'); return true; }
     if (trimmed === 'sync') { const c = cfgRef.current; const paths = findGitRepos(c.workspace); void runFullSync(paths, c.base, c.release, c.workspace, false); return true; }
@@ -363,6 +470,7 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
   // ── keyboard
   useInput((input, key) => {
     const isShiftS = input === 'S' || (key.shift && input.toLowerCase() === 's');
+    const isShiftR = input === 'R' || (key.shift && input.toLowerCase() === 'r');
 
     // --- global quit (always works) ---
     if (input === 'q') { process.exit(0); return; }
@@ -371,13 +479,13 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
     if (view === 'config') {
       if (key.escape) { setConfigError(''); setView('list'); return; }
       if (key.tab || key.downArrow) {
-        const idx = CONFIG_FIELDS.indexOf(configFocus);
-        setConfigFocus(CONFIG_FIELDS[(idx + 1) % CONFIG_FIELDS.length]!);
+        const idx = visibleConfigFields.indexOf(configFocus);
+        setConfigFocus(visibleConfigFields[(idx + 1) % visibleConfigFields.length]!);
         return;
       }
       if (key.upArrow) {
-        const idx = CONFIG_FIELDS.indexOf(configFocus);
-        setConfigFocus(CONFIG_FIELDS[(idx - 1 + CONFIG_FIELDS.length) % CONFIG_FIELDS.length]!);
+        const idx = visibleConfigFields.indexOf(configFocus);
+        setConfigFocus(visibleConfigFields[(idx - 1 + visibleConfigFields.length) % visibleConfigFields.length]!);
         return;
       }
       if (key.return) { applyConfig(); return; }
@@ -470,7 +578,7 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
       if (input === 'c') { setSelectedCommit(0); setView('commits'); return; }
       if (input === 's') { void runSingleSync(selectedRepo); return; }
       if (input === 'e') {
-        setConfigDraft({ workspace: cfgRef.current.workspace, base: cfgRef.current.base, release: cfgRef.current.release, syncInterval: String(cfgRef.current.syncInterval), token: cfgRef.current.token, provider: cfgRef.current.provider });
+        setConfigDraft({ workspace: cfgRef.current.workspace, base: cfgRef.current.base, release: cfgRef.current.release, syncInterval: String(cfgRef.current.syncInterval), token: cfgRef.current.token, provider: cfgRef.current.provider, taskProvider: cfgRef.current.taskProvider, jiraUrl: cfgRef.current.jiraUrl, jiraEmail: cfgRef.current.jiraEmail, jiraApiToken: cfgRef.current.jiraApiToken });
         setConfigFocus('workspace');
         setConfigError('');
         setView('config');
@@ -539,6 +647,20 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
       if (key.downArrow || input === 'j') { navigateFilteredPR(1); return; }
       if (input === 'g') { navigateFilteredPRToEnd(-1); return; }
       if (input === 'G') { navigateFilteredPRToEnd(1); return; }
+      if (isShiftR) {
+        if (!visibleSelectedPR) return;
+        const repo = repos.find((r) => r.name === visibleSelectedPR.repoName) ?? repos[selectedRepo];
+        if (!repo) return;
+        setReviewContext({ repoPath: repo.path, prNumber: visibleSelectedPR.number, fallbackPR: visibleSelectedPR, returnView: 'prs' });
+        setPRDetail(null);
+        setPRDetailError('');
+        setReviewError('');
+        setReviewJira(null);
+        setReviewLoading(true);
+        setReviewDescriptionScroll(0);
+        setView('review');
+        return;
+      }
       if (key.return) {
         if (!visibleSelectedPR) return;
         setSelectedPR(sortedPRs.indexOf(visibleSelectedPR));
@@ -561,12 +683,44 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
       if (key.downArrow || input === 'j') { setPRDescriptionScroll((s) => s + 1); return; }
       if (key.pageUp) { setPRDescriptionScroll((s) => Math.max(0, s - 8)); return; }
       if (key.pageDown) { setPRDescriptionScroll((s) => s + 8); return; }
+      if (isShiftR) {
+        if (!visibleSelectedPR) return;
+        const repo = repos.find((r) => r.name === visibleSelectedPR.repoName) ?? repos[selectedRepo];
+        if (!repo) return;
+        setReviewContext({ repoPath: repo.path, prNumber: visibleSelectedPR.number, fallbackPR: visibleSelectedPR, returnView: 'prdetail' });
+        setPRDetail(null);
+        setPRDetailError('');
+        setReviewError('');
+        setReviewJira(null);
+        setReviewLoading(true);
+        setReviewDescriptionScroll(0);
+        setView('review');
+        return;
+      }
       if (input === 'o' || input === 'O') {
         const pr = visibleSelectedPR;
         if (pr?.url) void openInBrowser(pr.url);
         return;
       }
       if (input === 'b' || key.escape) { setPRDescriptionScroll(0); setPRDetail(null); setView('prs'); return; }
+    } else if (view === 'review') {
+      if (input === ':') { setInputQuery(''); setInputMode('command'); return; }
+      if (input === '/') { setInputQuery(''); setInputMode('search'); return; }
+      if (key.upArrow || input === 'k') { setReviewDescriptionScroll((s) => Math.max(0, s - 1)); return; }
+      if (key.downArrow || input === 'j') { setReviewDescriptionScroll((s) => s + 1); return; }
+      if (key.pageUp) { setReviewDescriptionScroll((s) => Math.max(0, s - 8)); return; }
+      if (key.pageDown) { setReviewDescriptionScroll((s) => s + 8); return; }
+      if (input === 'o' || input === 'O') {
+        if (prDetail?.url) void openInBrowser(prDetail.url);
+        return;
+      }
+      if (input === 'b' || key.escape) {
+        setReviewDescriptionScroll(0);
+        setReviewLoading(false);
+        setReviewError('');
+        setView(reviewContext.returnView);
+        return;
+      }
     }
   });
 
@@ -655,6 +809,9 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
         )}
         {view === 'prdetail' && (
           <PRDetailView pr={prDetail} loading={prDetailLoading} error={prDetailError} frame={frame} width={width} descriptionScroll={prDescriptionScroll} />
+        )}
+        {view === 'review' && (
+          <ReviewView pr={prDetail} jira={reviewJira} loading={reviewLoading || prDetailLoading} error={reviewError || prDetailError} frame={frame} width={width} descriptionScroll={reviewDescriptionScroll} />
         )}
       </Box>
 

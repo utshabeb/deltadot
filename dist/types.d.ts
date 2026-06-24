@@ -1,7 +1,8 @@
 export type RepoStatus = 'loading' | 'stale' | 'syncing' | 'synced' | 'behind' | 'error';
-export type View = 'list' | 'commits' | 'detail' | 'config' | 'prs' | 'prdetail';
+export type View = 'list' | 'commits' | 'detail' | 'config' | 'prs' | 'prdetail' | 'review';
 export type InputMode = 'none' | 'search' | 'command';
 export type Provider = 'github' | 'gitlab' | 'bitbucket';
+export type TaskProvider = 'none' | 'jira' | 'clickup' | 'github';
 export interface AppConfig {
     workspace: string;
     base: string;
@@ -9,6 +10,10 @@ export interface AppConfig {
     syncInterval: number;
     token: string;
     provider: Provider;
+    taskProvider: TaskProvider;
+    jiraUrl: string;
+    jiraEmail: string;
+    jiraApiToken: string;
 }
 export interface CommitEntry {
     hash: string;
@@ -61,6 +66,7 @@ export interface PR {
     createdAt: string;
     url: string;
     repoName: string;
+    approved: boolean;
 }
 export interface PRCommit {
     hash: string;
@@ -110,7 +116,18 @@ export interface PRDetail {
     commitsCount?: number;
     commits?: PRCommit[];
 }
-export type ConfigField = 'workspace' | 'base' | 'release' | 'syncInterval' | 'token' | 'provider';
+export interface JiraIssue {
+    key: string;
+    summary: string;
+    description: string;
+    status: string;
+    issueType: string;
+    assignee: string;
+    reporter: string;
+    url: string;
+}
+export type ConfigField = 'workspace' | 'base' | 'release' | 'syncInterval' | 'token' | 'provider' | 'taskProvider' | 'jiraUrl' | 'jiraEmail' | 'jiraApiToken';
 export declare const CONFIG_FIELDS: ConfigField[];
+export declare function getVisibleConfigFields(taskProvider: TaskProvider): ConfigField[];
 export declare const CONFIG_LABELS: Record<ConfigField, string>;
 //# sourceMappingURL=types.d.ts.map

@@ -5,14 +5,15 @@ import type { View } from '../types.js';
 export function BottomBar({ view, syncingCount, browserError, showBranch, width }: {
   view: View; syncingCount: number; browserError: string; showBranch: boolean; width: number;
 }) {
-  const modeLabel = view === 'list' ? 'REPO' : view === 'commits' ? 'COMMITS' : view === 'detail' ? 'DETAIL' : view === 'prs' ? 'PR' : view === 'prdetail' ? 'PR' : 'CONFIG';
+  const modeLabel = view === 'list' ? 'REPO' : view === 'commits' ? 'COMMITS' : view === 'detail' ? 'DETAIL' : view === 'prs' ? 'PR' : view === 'prdetail' ? 'PR' : view === 'review' ? 'REVIEW' : 'CONFIG';
 
   const binds: [string, string][] =
     view === 'list'    ? [['↑↓/j:k', 'nav'], ['g/G', 'top/bot'], [':', 'cmd'], ['/', 'filter'], ['↵', 'open'], ['P', 'PR'], ['o', 'PR'], ['s', 'sync'], ['S', 'sync all'], ['b', showBranch ? 'hide br' : 'branch'], ['e', 'cfg'], ['q', 'quit']]
     : view === 'commits' ? [['↑↓/j:k', 'nav'], [':', 'cmd'], ['↵', 'detail'], ['o', 'browse'], ['s', 'sync'], ['b/Esc', 'back'], ['q', 'quit']]
     : view === 'detail'  ? [[':', 'cmd'], ['b/Esc', 'back'], ['q', 'quit']]
-    : view === 'prs' ? [['↑↓/j:k', 'nav'], [':', 'cmd'], ['↵', 'detail'], ['o', 'browse'], ['S', 'sync'], ['b/Esc', 'back'], ['q', 'quit']]
-    : view === 'prdetail' ? [[':', 'cmd'], ['o', 'browse'], ['b/Esc', 'back'], ['q', 'quit']]
+    : view === 'prs' ? [['↑↓/j:k', 'nav'], [':', 'cmd'], ['↵', 'detail'], ['R', 'review'], ['o', 'browse'], ['S', 'sync'], ['b/Esc', 'back'], ['q', 'quit']]
+    : view === 'prdetail' ? [[':', 'cmd'], ['R', 'review'], ['o', 'browse'], ['b/Esc', 'back'], ['q', 'quit']]
+    : view === 'review' ? [[':', 'cmd'], ['j/k', 'scroll'], ['o', 'browse'], ['b/Esc', 'back'], ['q', 'quit']]
     : view === 'config' ? [['Tab', 'next'], ['↑↓', 'move'], ['↵', 'save'], ['Esc', 'cancel'], ['q', 'quit']]
     : [];
 

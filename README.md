@@ -11,6 +11,7 @@ It scans every Git repo in a folder, compares the configured `base` and `release
 - Live terminal dashboard built with Ink
 - PR list and PR detail views
 - GitHub, GitLab, and Bitbucket PR fetching
+- Jira task review screen with `Shift+R`
 - Cache support for fast startup and background refresh
 
 ## Install
@@ -48,6 +49,16 @@ npm start
 - `--sync-interval <minutes>` - auto-sync interval in minutes
 - `--token <token>` - API token for PR fetching
 - `--provider <type>` - `github`, `gitlab`, or `bitbucket`
+
+## Task Provider Config
+
+Global config also supports a single active task provider for reviews.
+
+Jira Cloud fields:
+- `taskProvider`: `jira`
+- `jiraUrl`
+- `jiraEmail`
+- `jiraApiToken`
 
 ## Keyboard Shortcuts
 

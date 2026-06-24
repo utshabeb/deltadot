@@ -12,6 +12,7 @@ export function PRsView({ prs, syncingRepoNames, selectedIdx, loading, error, fr
         ? Math.min(Math.max(10, ...prs.map(p => (p.repoName ?? '').length)), 36)
         : 10;
     const stateW = 6;
+    const aprvdW = 5;
     const branchW = prs.length > 0
         ? Math.min(Math.max(12, ...prs.map(p => (p.sourceBranch ?? '').length)), 32)
         : 18;
@@ -19,7 +20,7 @@ export function PRsView({ prs, syncingRepoNames, selectedIdx, loading, error, fr
         ? Math.min(Math.max(10, ...prs.map(p => (p.author ?? '').length)), 28)
         : 10;
     const ageW = 8;
-    const titleW = Math.max(10, width - indent - snW - ageW - numW - repoW - stateW - branchW - authorW - sep.length * 7);
+    const titleW = Math.max(10, width - indent - snW - ageW - numW - repoW - stateW - aprvdW - branchW - authorW - sep.length * 8);
     const columns = [
         { label: '#', width: snW },
         { label: 'TITLE', width: titleW },
@@ -27,6 +28,7 @@ export function PRsView({ prs, syncingRepoNames, selectedIdx, loading, error, fr
         { label: 'PR #', width: numW },
         { label: 'REPO', width: repoW },
         { label: 'STATE', width: stateW },
+        { label: 'APRVD', width: aprvdW },
         { label: 'BRANCH', width: branchW },
         { label: 'AUTHOR', width: authorW },
     ];
@@ -49,12 +51,13 @@ export function PRsView({ prs, syncingRepoNames, selectedIdx, loading, error, fr
                     const numCol = pad(String(pr.number), numW);
                     const repoCol = pad(truncate(pr.repoName, repoW), repoW);
                     const stateCol = pad(pr.state, stateW);
+                    const aprvdCol = pad(pr.approved ? 'true' : 'false', aprvdW);
                     const branchCol = pad(truncate(pr.sourceBranch, branchW), branchW);
                     const authorCol = pad(truncate(pr.author, authorW), authorW);
                     if (isSel) {
-                        return (_jsxs(Box, { paddingLeft: indent, flexDirection: "row", alignItems: "flex-start", children: [_jsx(Text, { color: "yellowBright", bold: true, children: snCol }), _jsx(Text, { color: "cyanBright", children: sep }), _jsx(Box, { width: titleW, marginRight: 0, children: _jsxs(Text, { color: "yellowBright", bold: true, wrap: "wrap", children: [isSyncing ? `${SPINNER[frame % SPINNER.length]} ` : '', pr.title] }) }), _jsx(Text, { color: "cyanBright", children: sep }), _jsx(Text, { color: "white", children: ageCol }), _jsx(Text, { color: "cyanBright", children: sep }), _jsx(Text, { color: "yellowBright", bold: true, children: numCol }), _jsx(Text, { color: "cyanBright", children: sep }), _jsx(Text, { color: "magentaBright", children: repoCol }), _jsx(Text, { color: "cyanBright", children: sep }), _jsx(Text, { color: stateColor, children: stateCol }), _jsx(Text, { color: "cyanBright", children: sep }), _jsx(Text, { color: "whiteBright", children: branchCol }), _jsx(Text, { color: "cyanBright", children: sep }), _jsx(Text, { color: "cyanBright", children: authorCol })] }, `${pr.repoName}-${pr.number}`));
+                        return (_jsxs(Box, { paddingLeft: indent, flexDirection: "row", alignItems: "flex-start", children: [_jsx(Text, { color: "yellowBright", bold: true, children: snCol }), _jsx(Text, { color: "cyanBright", children: sep }), _jsx(Box, { width: titleW, marginRight: 0, children: _jsxs(Text, { color: "yellowBright", bold: true, wrap: "wrap", children: [isSyncing ? `${SPINNER[frame % SPINNER.length]} ` : '', pr.title] }) }), _jsx(Text, { color: "cyanBright", children: sep }), _jsx(Text, { color: "white", children: ageCol }), _jsx(Text, { color: "cyanBright", children: sep }), _jsx(Text, { color: "yellowBright", bold: true, children: numCol }), _jsx(Text, { color: "cyanBright", children: sep }), _jsx(Text, { color: "magentaBright", children: repoCol }), _jsx(Text, { color: "cyanBright", children: sep }), _jsx(Text, { color: stateColor, children: stateCol }), _jsx(Text, { color: "cyanBright", children: sep }), _jsx(Text, { color: "yellowBright", bold: true, children: aprvdCol }), _jsx(Text, { color: "cyanBright", children: sep }), _jsx(Text, { color: "whiteBright", children: branchCol }), _jsx(Text, { color: "cyanBright", children: sep }), _jsx(Text, { color: "cyanBright", children: authorCol })] }, `${pr.repoName}-${pr.number}`));
                     }
-                    return (_jsxs(Box, { paddingLeft: indent, flexDirection: "row", alignItems: "flex-start", children: [_jsx(Text, { color: "cyan", children: snCol }), _jsx(Text, { color: "cyanBright", children: sep }), _jsx(Box, { width: titleW, children: _jsxs(Text, { color: "white", wrap: "wrap", children: [isSyncing ? `${SPINNER[frame % SPINNER.length]} ` : '', pr.title] }) }), _jsx(Text, { color: "cyanBright", children: sep }), _jsx(Text, { color: "white", children: ageCol }), _jsx(Text, { color: "cyanBright", children: sep }), _jsx(Text, { color: "cyan", children: numCol }), _jsx(Text, { color: "cyanBright", children: sep }), _jsx(Text, { color: "magentaBright", children: repoCol }), _jsx(Text, { color: "cyanBright", children: sep }), _jsx(Text, { color: stateColor, children: stateCol }), _jsx(Text, { color: "cyanBright", children: sep }), _jsx(Text, { color: "whiteBright", children: branchCol }), _jsx(Text, { color: "cyanBright", children: sep }), _jsx(Text, { color: "cyanBright", children: authorCol })] }, `${pr.repoName}-${pr.number}`));
+                    return (_jsxs(Box, { paddingLeft: indent, flexDirection: "row", alignItems: "flex-start", children: [_jsx(Text, { color: "cyan", children: snCol }), _jsx(Text, { color: "cyanBright", children: sep }), _jsx(Box, { width: titleW, children: _jsxs(Text, { color: "white", wrap: "wrap", children: [isSyncing ? `${SPINNER[frame % SPINNER.length]} ` : '', pr.title] }) }), _jsx(Text, { color: "cyanBright", children: sep }), _jsx(Text, { color: "white", children: ageCol }), _jsx(Text, { color: "cyanBright", children: sep }), _jsx(Text, { color: "cyan", children: numCol }), _jsx(Text, { color: "cyanBright", children: sep }), _jsx(Text, { color: "magentaBright", children: repoCol }), _jsx(Text, { color: "cyanBright", children: sep }), _jsx(Text, { color: stateColor, children: stateCol }), _jsx(Text, { color: "cyanBright", children: sep }), _jsx(Text, { color: pr.approved ? 'greenBright' : 'redBright', children: aprvdCol }), _jsx(Text, { color: "cyanBright", children: sep }), _jsx(Text, { color: "whiteBright", children: branchCol }), _jsx(Text, { color: "cyanBright", children: sep }), _jsx(Text, { color: "cyanBright", children: authorCol })] }, `${pr.repoName}-${pr.number}`));
                 })) })] }));
 }
 function formatAge(dateStr) {
