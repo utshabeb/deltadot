@@ -81,6 +81,7 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewError, setReviewError] = useState('');
   const [reviewDescriptionScroll, setReviewDescriptionScroll] = useState(0);
+  const [reviewJiraCollapsed, setReviewJiraCollapsed] = useState(false);
 
   // ── config editing state
   const [configDraft, setConfigDraft]   = useState<Record<ConfigField, string>>({
@@ -316,6 +317,7 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
     setReviewError('');
     setReviewJira(null);
     setReviewDescriptionScroll(0);
+    setReviewJiraCollapsed(false);
 
     try {
       const currentDetail = prDetailRef.current;
@@ -706,6 +708,10 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
     } else if (view === 'review') {
       if (input === ':') { setInputQuery(''); setInputMode('command'); return; }
       if (input === '/') { setInputQuery(''); setInputMode('search'); return; }
+      if (key.return || input === 'd') {
+        setReviewJiraCollapsed((c) => !c);
+        return;
+      }
       if (key.upArrow || input === 'k') { setReviewDescriptionScroll((s) => Math.max(0, s - 1)); return; }
       if (key.downArrow || input === 'j') { setReviewDescriptionScroll((s) => s + 1); return; }
       if (key.pageUp) { setReviewDescriptionScroll((s) => Math.max(0, s - 8)); return; }
@@ -811,7 +817,7 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
           <PRDetailView pr={prDetail} loading={prDetailLoading} error={prDetailError} frame={frame} width={width} descriptionScroll={prDescriptionScroll} />
         )}
         {view === 'review' && (
-          <ReviewView pr={prDetail} jira={reviewJira} loading={reviewLoading || prDetailLoading} error={reviewError || prDetailError} frame={frame} width={width} descriptionScroll={reviewDescriptionScroll} />
+          <ReviewView pr={prDetail} jira={reviewJira} loading={reviewLoading || prDetailLoading} error={reviewError || prDetailError} frame={frame} width={width} descriptionScroll={reviewDescriptionScroll} collapsed={reviewJiraCollapsed} />
         )}
       </Box>
 

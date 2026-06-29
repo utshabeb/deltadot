@@ -13,7 +13,7 @@ export function BottomBar({ view, syncingCount, browserError, showBranch, width 
     : view === 'detail'  ? [[':', 'cmd'], ['b/Esc', 'back'], ['q', 'quit']]
     : view === 'prs' ? [['↑↓/j:k', 'nav'], [':', 'cmd'], ['↵', 'detail'], ['R', 'review'], ['o', 'browse'], ['S', 'sync'], ['b/Esc', 'back'], ['q', 'quit']]
     : view === 'prdetail' ? [[':', 'cmd'], ['R', 'review'], ['o', 'browse'], ['b/Esc', 'back'], ['q', 'quit']]
-    : view === 'review' ? [[':', 'cmd'], ['j/k', 'scroll'], ['o', 'browse'], ['b/Esc', 'back'], ['q', 'quit']]
+    : view === 'review' ? [[':', 'cmd'], ['j/k', 'scroll'], ['d/↵', 'toggle desc'], ['o', 'browse'], ['b/Esc', 'back'], ['q', 'quit']]
     : view === 'config' ? [['Tab', 'next'], ['↑↓', 'move'], ['↵', 'save'], ['Esc', 'cancel'], ['q', 'quit']]
     : [];
 

@@ -64,6 +64,7 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
     const [reviewLoading, setReviewLoading] = useState(false);
     const [reviewError, setReviewError] = useState('');
     const [reviewDescriptionScroll, setReviewDescriptionScroll] = useState(0);
+    const [reviewJiraCollapsed, setReviewJiraCollapsed] = useState(false);
     // ── config editing state
     const [configDraft, setConfigDraft] = useState({
         workspace: initialConfig.workspace,
@@ -286,6 +287,7 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
         setReviewError('');
         setReviewJira(null);
         setReviewDescriptionScroll(0);
+        setReviewJiraCollapsed(false);
         try {
             const currentDetail = prDetailRef.current;
             const detail = currentDetail?.number === prNumber ? currentDetail : await fetchPRDetailForRepo(repoPath, prNumber);
@@ -873,6 +875,10 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
                 setInputMode('search');
                 return;
             }
+            if (key.return || input === 'd') {
+                setReviewJiraCollapsed((c) => !c);
+                return;
+            }
             if (key.upArrow || input === 'k') {
                 setReviewDescriptionScroll((s) => Math.max(0, s - 1));
                 return;
@@ -917,7 +923,7 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
                         setSearchQuery('');
                     setInputMode('none');
                     setInputQuery('');
-                } })), _jsxs(Box, { flexDirection: "column", flexGrow: 1, paddingTop: 0, children: [view === 'list' && (_jsx(RepoList, { repos: filteredRepos, allRepos: repos, selectedIdx: selectedRepo, searchQuery: searchQuery, showBranch: showBranch, frame: frame, width: width })), view === 'commits' && currentRepo && (_jsx(CommitsView, { repo: currentRepo, base: cfg.base, release: cfg.release, selectedCommitIdx: selectedCommit, frame: frame, width: width })), view === 'detail' && (_jsx(DetailView, { detail: detail, frame: frame, width: width })), view === 'config' && (_jsx(ConfigView, { draft: configDraft, focusedField: configFocus, validationError: configError, width: width, onChange: (field, val) => setConfigDraft((prev) => ({ ...prev, [field]: val })), onSave: applyConfig, onCancel: () => { setConfigError(''); setView('list'); } })), view === 'prs' && (_jsx(PRsView, { prs: filteredPRs, syncingRepoNames: syncingRepoNames, selectedIdx: selectedFilteredPRPos, loading: prLoading, error: prError, frame: frame, width: width })), view === 'prdetail' && (_jsx(PRDetailView, { pr: prDetail, loading: prDetailLoading, error: prDetailError, frame: frame, width: width, descriptionScroll: prDescriptionScroll })), view === 'review' && (_jsx(ReviewView, { pr: prDetail, jira: reviewJira, loading: reviewLoading || prDetailLoading, error: reviewError || prDetailError, frame: frame, width: width, descriptionScroll: reviewDescriptionScroll }))] }), _jsx(Box, { height: 1, minHeight: 1, children: _jsx(Text, { dimColor: true, children: '─'.repeat(width) }) }), _jsx(BottomBar, { view: view, syncingCount: syncingCount, browserError: browserError, showBranch: showBranch, width: width })] }));
+                } })), _jsxs(Box, { flexDirection: "column", flexGrow: 1, paddingTop: 0, children: [view === 'list' && (_jsx(RepoList, { repos: filteredRepos, allRepos: repos, selectedIdx: selectedRepo, searchQuery: searchQuery, showBranch: showBranch, frame: frame, width: width })), view === 'commits' && currentRepo && (_jsx(CommitsView, { repo: currentRepo, base: cfg.base, release: cfg.release, selectedCommitIdx: selectedCommit, frame: frame, width: width })), view === 'detail' && (_jsx(DetailView, { detail: detail, frame: frame, width: width })), view === 'config' && (_jsx(ConfigView, { draft: configDraft, focusedField: configFocus, validationError: configError, width: width, onChange: (field, val) => setConfigDraft((prev) => ({ ...prev, [field]: val })), onSave: applyConfig, onCancel: () => { setConfigError(''); setView('list'); } })), view === 'prs' && (_jsx(PRsView, { prs: filteredPRs, syncingRepoNames: syncingRepoNames, selectedIdx: selectedFilteredPRPos, loading: prLoading, error: prError, frame: frame, width: width })), view === 'prdetail' && (_jsx(PRDetailView, { pr: prDetail, loading: prDetailLoading, error: prDetailError, frame: frame, width: width, descriptionScroll: prDescriptionScroll })), view === 'review' && (_jsx(ReviewView, { pr: prDetail, jira: reviewJira, loading: reviewLoading || prDetailLoading, error: reviewError || prDetailError, frame: frame, width: width, descriptionScroll: reviewDescriptionScroll, collapsed: reviewJiraCollapsed }))] }), _jsx(Box, { height: 1, minHeight: 1, children: _jsx(Text, { dimColor: true, children: '─'.repeat(width) }) }), _jsx(BottomBar, { view: view, syncingCount: syncingCount, browserError: browserError, showBranch: showBranch, width: width })] }));
 }
 function matchesPRSearch(pr, query) {
     if (!query)

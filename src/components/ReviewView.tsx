@@ -11,6 +11,7 @@ export function ReviewView({
   frame,
   width,
   descriptionScroll,
+  collapsed,
 }: {
   pr: PRDetail | null;
   jira: JiraIssue | null;
@@ -19,6 +20,7 @@ export function ReviewView({
   frame: number;
   width: number;
   descriptionScroll: number;
+  collapsed: boolean;
 }) {
   const indent = 3;
 
@@ -106,13 +108,15 @@ export function ReviewView({
           {jira ? (
             <Box flexDirection="column" marginTop={1}>
               <Box>
-                <Text color="whiteBright" bold>Description</Text>
+                <Text color="whiteBright" bold>{collapsed ? '+Description' : '-Description'}</Text>
               </Box>
-              <Box flexDirection="column">
-                {jiraLines.map((line, i) => (
-                  <Text key={`${i}`} color="white" wrap="wrap">{line || ' '}</Text>
-                ))}
-              </Box>
+              {!collapsed && (
+                <Box flexDirection="column">
+                  {jiraLines.map((line, i) => (
+                    <Text key={`${i}`} color="white" wrap="wrap">{line || ' '}</Text>
+                  ))}
+                </Box>
+              )}
             </Box>
           ) : null}
         </Box>
