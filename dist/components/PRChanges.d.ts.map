@@ -1,0 +1,1 @@
+{"version":3,"file":"PRChanges.d.ts","sourceRoot":"","sources":["../../src/components/PRChanges.tsx"],"names":[],"mappings":"AAAA,OAAO,KAAK,MAAM,OAAO,CAAC;AAE1B,OAAO,KAAK,EAAE,QAAQ,EAAY,MAAM,aAAa,CAAC;AAGtD,wBAAgB,SAAS,CAAC,EACxB,EAAE,EACF,KAAK,GACN,EAAE;IACD,EAAE,EAAE,QAAQ,CAAC;IACb,KAAK,EAAE,MAAM,CAAC;CACf,qBAqBA"}

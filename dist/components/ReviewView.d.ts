@@ -1,5 +1,5 @@
 import React from 'react';
-import type { JiraIssue, PRDetail } from '../types.js';
+import type { PRDetail, JiraIssue } from '../types.js';
 export declare function ReviewView({ pr, jira, loading, error, frame, width, descriptionScroll, collapsed, terminalHeight, }: {
     pr: PRDetail | null;
     jira: JiraIssue | null;
