@@ -19,7 +19,8 @@ export function ReviewView({ pr, jira, loading, error, frame, width, description
     const gap = 2;
     const leftWidth = stacked ? contentWidth : Math.floor(contentWidth * 0.45);
     const rightWidth = stacked ? contentWidth : contentWidth - leftWidth - gap;
-    const jiraLines = wrapText(jira?.description ?? 'No Jira description available.', Math.max(20, leftWidth - 4));
+    const jiraDesc = (jira?.description || '').trim();
+    const jiraLines = wrapText(jiraDesc || 'No Jira description available.', Math.max(20, leftWidth - 4));
     const jiraViewport = Math.max(6, terminalHeight - 18);
     const jiraMaxScroll = Math.max(0, jiraLines.length - jiraViewport);
     const clampedJiraScroll = Math.min(descriptionScroll, jiraMaxScroll);

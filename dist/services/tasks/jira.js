@@ -73,6 +73,59 @@ function adfToText(node) {
     if (node.type === 'listItem') {
         return `${adfToText(node.content)}`;
     }
+    if (node.type === 'table') {
+        const rows = Array.isArray(node.content) ? node.content : [];
+        if (rows.length === 0)
+            return '\n';
+        const tableData = [];
+        let maxCols = 0;
+        for (const rawRow of rows) {
+            if (rawRow.type !== 'tableRow')
+                continue;
+            const cells = Array.isArray(rawRow.content) ? rawRow.content : [];
+            const rowCells = cells.map((c) => ({
+                text: adfToText(c.content).trim().replace(/\n\s*/g, ' '),
+                isHeader: c.type === 'tableHeader',
+            }));
+            tableData.push(rowCells);
+            maxCols = Math.max(maxCols, rowCells.length);
+        }
+        if (tableData.length === 0)
+            return '\n';
+        for (const row of tableData) {
+            while (row.length < maxCols)
+                row.push({ text: '', isHeader: false });
+        }
+        const colWidths = Array(maxCols).fill(0);
+        for (const row of tableData) {
+            for (let i = 0; i < maxCols; i++) {
+                colWidths[i] = Math.max(colWidths[i], (row[i]?.text ?? '').length);
+            }
+        }
+        const sep = colWidths.map(w => '─'.repeat(w)).join('─┼─');
+        const headerRows = new Set();
+        for (let ri = 0; ri < tableData.length; ri++) {
+            if (tableData[ri].some(c => c.isHeader))
+                headerRows.add(ri);
+        }
+        const lines = [];
+        for (let ri = 0; ri < tableData.length; ri++) {
+            const row = tableData[ri];
+            const cells = row.map((cell, ci) => {
+                const w = colWidths[ci] ?? 0;
+                const text = cell.isHeader ? cell.text.toUpperCase() : cell.text;
+                return text.padEnd(w);
+            }).join(' │ ');
+            lines.push(`  ${cells}`);
+            if (headerRows.has(ri)) {
+                lines.push(` ${sep}`);
+            }
+        }
+        return `\n${lines.join('\n')}\n`;
+    }
+    if (node.type === 'rule') {
+        return '\n─────────────────\n';
+    }
     return adfToText(node.content);
 }
 //# sourceMappingURL=jira.js.map
