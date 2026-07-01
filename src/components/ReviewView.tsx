@@ -12,6 +12,7 @@ export function ReviewView({
   width,
   descriptionScroll,
   collapsed,
+  terminalHeight,
 }: {
   pr: PRDetail | null;
   jira: JiraIssue | null;
@@ -21,6 +22,7 @@ export function ReviewView({
   width: number;
   descriptionScroll: number;
   collapsed: boolean;
+  terminalHeight: number;
 }) {
   const indent = 3;
 
@@ -63,6 +65,13 @@ export function ReviewView({
   const leftWidth = stacked ? contentWidth : Math.floor(contentWidth * 0.45);
   const rightWidth = stacked ? contentWidth : contentWidth - leftWidth - gap;
   const jiraLines = wrapText(jira?.description ?? 'No Jira description available.', Math.max(20, leftWidth - 4));
+  const jiraViewport = Math.max(6, terminalHeight - 18);
+  const jiraMaxScroll = Math.max(0, jiraLines.length - jiraViewport);
+  const clampedJiraScroll = Math.min(descriptionScroll, jiraMaxScroll);
+  const visibleJiraLines = jiraLines.slice(clampedJiraScroll, clampedJiraScroll + jiraViewport);
+  const showProgress = jiraLines.length > jiraViewport;
+  const progressText = showProgress ? ` [${clampedJiraScroll + 1}/${jiraMaxScroll + 1}]` : '';
+  const descTitle = collapsed ? '+Description' : `-Description${progressText}`;
   const commits = [...(pr.commits ?? [])].sort((a, b) => dateValue(b.date) - dateValue(a.date));
   const commitSummary = `${pr.additions ?? 0} additions · ${pr.deletions ?? 0} deletions · ${pr.changedFiles ?? 0} files · ${pr.commitsCount ?? commits.length} commits`;
 
@@ -108,12 +117,12 @@ export function ReviewView({
           {jira ? (
             <Box flexDirection="column" marginTop={1}>
               <Box>
-                <Text color="whiteBright" bold>{collapsed ? '+Description' : '-Description'}</Text>
+                <Text color="whiteBright" bold>{descTitle}</Text>
               </Box>
               {!collapsed && (
                 <Box flexDirection="column">
-                  {jiraLines.map((line, i) => (
-                    <Text key={`${i}`} color="white" wrap="wrap">{line || ' '}</Text>
+                  {visibleJiraLines.map((line, i) => (
+                    <Text key={`${clampedJiraScroll}-${i}`} color="white" wrap="wrap">{line || ' '}</Text>
                   ))}
                 </Box>
               )}

@@ -28,6 +28,7 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
 }) {
   const { stdout } = useStdout();
   const width = stdout?.columns ?? 100;
+  const height = stdout?.rows ?? 24;
 
   const COMMANDS = ['list', 'prs', 'commits', 'config', 'sync', 'q'];
 
@@ -817,7 +818,7 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
           <PRDetailView pr={prDetail} loading={prDetailLoading} error={prDetailError} frame={frame} width={width} descriptionScroll={prDescriptionScroll} />
         )}
         {view === 'review' && (
-          <ReviewView pr={prDetail} jira={reviewJira} loading={reviewLoading || prDetailLoading} error={reviewError || prDetailError} frame={frame} width={width} descriptionScroll={reviewDescriptionScroll} collapsed={reviewJiraCollapsed} />
+          <ReviewView pr={prDetail} jira={reviewJira} loading={reviewLoading || prDetailLoading} error={reviewError || prDetailError} frame={frame} width={width} descriptionScroll={reviewDescriptionScroll} collapsed={reviewJiraCollapsed} terminalHeight={height} />
         )}
       </Box>
 
