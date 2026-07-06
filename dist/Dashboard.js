@@ -919,7 +919,7 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
                 }
                 if (key.return || input === ' ') {
                     if (fileCount > 0) {
-                        const filesList = prDetail?.files ?? [];
+                        const filesList = [...(prDetail?.files ?? [])].sort((a, b) => a.path.localeCompare(b.path));
                         const focusedPath = filesList[reviewFileFocusIdx]?.path;
                         if (focusedPath) {
                             setReviewExpandedFiles((prev) => {
