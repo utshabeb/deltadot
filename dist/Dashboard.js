@@ -66,6 +66,10 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
     const [reviewError, setReviewError] = useState('');
     const [reviewDescriptionScroll, setReviewDescriptionScroll] = useState(0);
     const [reviewJiraCollapsed, setReviewJiraCollapsed] = useState(false);
+    const [reviewFocus, setReviewFocus] = useState('description');
+    const [reviewFileFocusIdx, setReviewFileFocusIdx] = useState(0);
+    const [reviewExpandedFiles, setReviewExpandedFiles] = useState([]);
+    const [reviewFilesCollapsed, setReviewFilesCollapsed] = useState(false);
     // ── config editing state
     const [configDraft, setConfigDraft] = useState({
         workspace: initialConfig.workspace,
@@ -289,6 +293,10 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
         setReviewJira(null);
         setReviewDescriptionScroll(0);
         setReviewJiraCollapsed(false);
+        setReviewFocus('description');
+        setReviewFileFocusIdx(0);
+        setReviewExpandedFiles([]);
+        setReviewFilesCollapsed(false);
         try {
             const currentDetail = prDetailRef.current;
             const detail = currentDetail?.number === prNumber ? currentDetail : await fetchPRDetailForRepo(repoPath, prNumber);
@@ -876,25 +884,73 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
                 setInputMode('search');
                 return;
             }
-            if (key.return || input === 'd') {
-                setReviewJiraCollapsed((c) => !c);
+            if (key.tab || key.leftArrow || key.rightArrow) {
+                setReviewFocus((f) => (f === 'description' ? 'files' : 'description'));
                 return;
             }
-            if (key.upArrow || input === 'k') {
-                setReviewDescriptionScroll((s) => Math.max(0, s - 1));
-                return;
+            const fileCount = prDetail?.files?.length ?? 0;
+            if (reviewFocus === 'description') {
+                if (key.return || input === 'd') {
+                    setReviewJiraCollapsed((c) => !c);
+                    return;
+                }
+                if (key.upArrow || input === 'k') {
+                    setReviewDescriptionScroll((s) => Math.max(0, s - 1));
+                    return;
+                }
+                if (key.downArrow || input === 'j') {
+                    setReviewDescriptionScroll((s) => s + 1);
+                    return;
+                }
+                if (key.pageUp) {
+                    setReviewDescriptionScroll((s) => Math.max(0, s - 8));
+                    return;
+                }
+                if (key.pageDown) {
+                    setReviewDescriptionScroll((s) => s + 8);
+                    return;
+                }
             }
-            if (key.downArrow || input === 'j') {
-                setReviewDescriptionScroll((s) => s + 1);
-                return;
-            }
-            if (key.pageUp) {
-                setReviewDescriptionScroll((s) => Math.max(0, s - 8));
-                return;
-            }
-            if (key.pageDown) {
-                setReviewDescriptionScroll((s) => s + 8);
-                return;
+            else {
+                // files focus
+                if (input === 'd') {
+                    setReviewFilesCollapsed((c) => !c);
+                    return;
+                }
+                if (key.return || input === ' ') {
+                    if (fileCount > 0) {
+                        const filesList = prDetail?.files ?? [];
+                        const focusedPath = filesList[reviewFileFocusIdx]?.path;
+                        if (focusedPath) {
+                            setReviewExpandedFiles((prev) => {
+                                if (prev.includes(focusedPath)) {
+                                    return prev.filter((p) => p !== focusedPath);
+                                }
+                                else {
+                                    return [...prev, focusedPath];
+                                }
+                            });
+                        }
+                    }
+                    return;
+                }
+                if (key.upArrow || input === 'k') {
+                    setReviewFileFocusIdx((idx) => Math.max(0, idx - 1));
+                    return;
+                }
+                if (key.downArrow || input === 'j') {
+                    setReviewFileFocusIdx((idx) => Math.min(Math.max(0, fileCount - 1), idx + 1));
+                    return;
+                }
+                if (input === 'a') {
+                    const allPaths = (prDetail?.files ?? []).map(f => f.path);
+                    setReviewExpandedFiles(allPaths);
+                    return;
+                }
+                if (input === 'A') {
+                    setReviewExpandedFiles([]);
+                    return;
+                }
             }
             if (input === 'o' || input === 'O') {
                 if (prDetail?.url)
@@ -924,7 +980,7 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
                         setSearchQuery('');
                     setInputMode('none');
                     setInputQuery('');
-                } })), _jsxs(Box, { flexDirection: "column", flexGrow: 1, paddingTop: 0, children: [view === 'list' && (_jsx(RepoList, { repos: filteredRepos, allRepos: repos, selectedIdx: selectedRepo, searchQuery: searchQuery, showBranch: showBranch, frame: frame, width: width })), view === 'commits' && currentRepo && (_jsx(CommitsView, { repo: currentRepo, base: cfg.base, release: cfg.release, selectedCommitIdx: selectedCommit, frame: frame, width: width })), view === 'detail' && (_jsx(DetailView, { detail: detail, frame: frame, width: width })), view === 'config' && (_jsx(ConfigView, { draft: configDraft, focusedField: configFocus, validationError: configError, width: width, onChange: (field, val) => setConfigDraft((prev) => ({ ...prev, [field]: val })), onSave: applyConfig, onCancel: () => { setConfigError(''); setView('list'); } })), view === 'prs' && (_jsx(PRsView, { prs: filteredPRs, syncingRepoNames: syncingRepoNames, selectedIdx: selectedFilteredPRPos, loading: prLoading, error: prError, frame: frame, width: width })), view === 'prdetail' && (_jsx(PRDetailView, { pr: prDetail, loading: prDetailLoading, error: prDetailError, frame: frame, width: width, descriptionScroll: prDescriptionScroll })), view === 'review' && (_jsx(ReviewView, { pr: prDetail, jira: reviewJira, loading: reviewLoading || prDetailLoading, error: reviewError || prDetailError, frame: frame, width: width, descriptionScroll: reviewDescriptionScroll, collapsed: reviewJiraCollapsed, terminalHeight: height }))] }), _jsx(Box, { height: 1, minHeight: 1, children: _jsx(Text, { dimColor: true, children: '─'.repeat(width) }) }), _jsx(BottomBar, { view: view, syncingCount: syncingCount, browserError: browserError, showBranch: showBranch, width: width })] }));
+                } })), _jsxs(Box, { flexDirection: "column", flexGrow: 1, paddingTop: 0, children: [view === 'list' && (_jsx(RepoList, { repos: filteredRepos, allRepos: repos, selectedIdx: selectedRepo, searchQuery: searchQuery, showBranch: showBranch, frame: frame, width: width })), view === 'commits' && currentRepo && (_jsx(CommitsView, { repo: currentRepo, base: cfg.base, release: cfg.release, selectedCommitIdx: selectedCommit, frame: frame, width: width })), view === 'detail' && (_jsx(DetailView, { detail: detail, frame: frame, width: width })), view === 'config' && (_jsx(ConfigView, { draft: configDraft, focusedField: configFocus, validationError: configError, width: width, onChange: (field, val) => setConfigDraft((prev) => ({ ...prev, [field]: val })), onSave: applyConfig, onCancel: () => { setConfigError(''); setView('list'); } })), view === 'prs' && (_jsx(PRsView, { prs: filteredPRs, syncingRepoNames: syncingRepoNames, selectedIdx: selectedFilteredPRPos, loading: prLoading, error: prError, frame: frame, width: width })), view === 'prdetail' && (_jsx(PRDetailView, { pr: prDetail, loading: prDetailLoading, error: prDetailError, frame: frame, width: width, descriptionScroll: prDescriptionScroll })), view === 'review' && (_jsx(ReviewView, { pr: prDetail, jira: reviewJira, loading: reviewLoading || prDetailLoading, error: reviewError || prDetailError, frame: frame, width: width, descriptionScroll: reviewDescriptionScroll, collapsed: reviewJiraCollapsed, terminalHeight: height, reviewFocus: reviewFocus, reviewFileFocusIdx: reviewFileFocusIdx, reviewExpandedFiles: reviewExpandedFiles, reviewFilesCollapsed: reviewFilesCollapsed }))] }), _jsx(Box, { height: 1, minHeight: 1, children: _jsx(Text, { dimColor: true, children: '─'.repeat(width) }) }), _jsx(BottomBar, { view: view, syncingCount: syncingCount, browserError: browserError, showBranch: showBranch, width: width })] }));
 }
 function matchesPRSearch(pr, query) {
     if (!query)

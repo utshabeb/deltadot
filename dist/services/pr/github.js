@@ -43,12 +43,14 @@ export async function fetchGitHubPRDetail(owner, repo, prNumber, token) {
     const reviewsUrl = `https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}/reviews?per_page=100`;
     const issueCommentsUrl = `https://api.github.com/repos/${owner}/${repo}/issues/${prNumber}/comments?per_page=100`;
     const reviewCommentsUrl = `https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}/comments?per_page=100`;
-    const [res, commitsRes, reviewsRes, issueCommentsRes, reviewCommentsRes] = await Promise.all([
+    const filesUrl = `https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}/files`;
+    const [res, commitsRes, reviewsRes, issueCommentsRes, reviewCommentsRes, filesRes] = await Promise.all([
         fetch(detailUrl, { headers }),
         fetch(commitsUrl, { headers }).catch(() => null),
         fetch(reviewsUrl, { headers }).catch(() => null),
         fetch(issueCommentsUrl, { headers }).catch(() => null),
         fetch(reviewCommentsUrl, { headers }).catch(() => null),
+        fetch(filesUrl, { headers }).catch(() => null),
     ]);
     if (!res.ok) {
         const errorBody = await res.text();
@@ -70,6 +72,25 @@ export async function fetchGitHubPRDetail(owner, repo, prNumber, token) {
         }
         catch {
             // Ignore commits parse failures to prevent detail page crashes
+        }
+    }
+    let files = [];
+    if (filesRes && filesRes.ok) {
+        try {
+            const fileData = await filesRes.json();
+            if (Array.isArray(fileData)) {
+                files = fileData.map((f) => ({
+                    path: f.filename ?? '',
+                    additions: f.additions ?? 0,
+                    deletions: f.deletions ?? 0,
+                    status: f.status === 'removed' ? 'deleted' : f.status === 'renamed' ? 'renamed' : f.status === 'added' ? 'added' : 'modified',
+                    previousPath: f.previous_filename ?? undefined,
+                    patch: f.patch ?? undefined,
+                }));
+            }
+        }
+        catch {
+            // Ignore files parse failures
         }
     }
     let requestedReviewers = [];
@@ -141,6 +162,7 @@ export async function fetchGitHubPRDetail(owner, repo, prNumber, token) {
         changedFiles: item.changed_files ?? 0,
         commitsCount: item.commits ?? commits.length,
         commits,
+        files,
     };
 }
 function loadGitHubComments(issueCommentsRes, reviewCommentsRes, reviewTimelineComments = []) {

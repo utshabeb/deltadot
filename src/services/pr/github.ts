@@ -1,4 +1,4 @@
-import type { PR, PRComment, PRDetail, PRCommit } from '../../types.js';
+import type { PR, PRComment, PRDetail, PRCommit, PRFile } from '../../types.js';
 import { githubHeaders, uniqueStrings } from './shared.js';
 
 export async function fetchGitHubPRs(
@@ -59,13 +59,15 @@ export async function fetchGitHubPRDetail(
   const reviewsUrl = `https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}/reviews?per_page=100`;
   const issueCommentsUrl = `https://api.github.com/repos/${owner}/${repo}/issues/${prNumber}/comments?per_page=100`;
   const reviewCommentsUrl = `https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}/comments?per_page=100`;
+  const filesUrl = `https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}/files`;
 
-  const [res, commitsRes, reviewsRes, issueCommentsRes, reviewCommentsRes] = await Promise.all([
+  const [res, commitsRes, reviewsRes, issueCommentsRes, reviewCommentsRes, filesRes] = await Promise.all([
     fetch(detailUrl, { headers }),
     fetch(commitsUrl, { headers }).catch(() => null),
     fetch(reviewsUrl, { headers }).catch(() => null),
     fetch(issueCommentsUrl, { headers }).catch(() => null),
     fetch(reviewCommentsUrl, { headers }).catch(() => null),
+    fetch(filesUrl, { headers }).catch(() => null),
   ]);
 
   if (!res.ok) {
@@ -89,6 +91,25 @@ export async function fetchGitHubPRDetail(
       }
     } catch {
       // Ignore commits parse failures to prevent detail page crashes
+    }
+  }
+
+  let files: PRFile[] = [];
+  if (filesRes && filesRes.ok) {
+    try {
+      const fileData = await filesRes.json() as any[];
+      if (Array.isArray(fileData)) {
+        files = fileData.map((f: any) => ({
+          path: (f.filename as string) ?? '',
+          additions: (f.additions as number) ?? 0,
+          deletions: (f.deletions as number) ?? 0,
+          status: (f.status as any) === 'removed' ? 'deleted' : (f.status as any) === 'renamed' ? 'renamed' : (f.status as any) === 'added' ? 'added' : 'modified',
+          previousPath: (f.previous_filename as string) ?? undefined,
+          patch: (f.patch as string) ?? undefined,
+        }));
+      }
+    } catch {
+      // Ignore files parse failures
     }
   }
 
@@ -160,6 +181,7 @@ export async function fetchGitHubPRDetail(
     changedFiles: (item.changed_files as number) ?? 0,
     commitsCount: (item.commits as number) ?? commits.length,
     commits,
+    files,
   };
 }
 

@@ -115,6 +115,15 @@ export interface PRDetail {
     changedFiles?: number;
     commitsCount?: number;
     commits?: PRCommit[];
+    files?: PRFile[];
+}
+export interface PRFile {
+    path: string;
+    additions: number;
+    deletions: number;
+    status: 'added' | 'modified' | 'deleted' | 'renamed';
+    previousPath?: string;
+    patch?: string;
 }
 export interface JiraIssue {
     key: string;

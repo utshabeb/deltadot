@@ -1,4 +1,4 @@
-import type { PR, PRDetail, PRCommit } from '../../types.js';
+import type { PR, PRDetail, PRCommit, PRFile } from '../../types.js';
 import { bearerHeaders } from './shared.js';
 
 export async function fetchGitLabPRs(
@@ -58,10 +58,12 @@ export async function fetchGitLabPRDetail(
 
   const url = `https://gitlab.com/api/v4/projects/${projectId}/merge_requests/${prNumber}`;
   const commitsUrl = `https://gitlab.com/api/v4/projects/${projectId}/merge_requests/${prNumber}/commits`;
+  const changesUrl = `https://gitlab.com/api/v4/projects/${projectId}/merge_requests/${prNumber}/changes`;
 
-  const [res, commitsRes] = await Promise.all([
+  const [res, commitsRes, changesRes] = await Promise.all([
     fetch(url, { headers }),
-    fetch(commitsUrl, { headers }).catch(() => null)
+    fetch(commitsUrl, { headers }).catch(() => null),
+    fetch(changesUrl, { headers }).catch(() => null)
   ]);
 
   if (!res.ok) {
@@ -88,6 +90,37 @@ export async function fetchGitLabPRDetail(
     }
   }
 
+  let files: PRFile[] = [];
+  let additions = 0;
+  let deletions = 0;
+  let changedFiles = 0;
+  if (changesRes && changesRes.ok) {
+    try {
+      const changesData = await changesRes.json() as any;
+      const changesList = changesData.changes ?? [];
+      if (Array.isArray(changesList)) {
+        changedFiles = changesList.length;
+        files = changesList.map((c: any) => {
+          const patch = c.diff || '';
+          const stats = parseDiffPatch(patch);
+          additions += stats.additions;
+          deletions += stats.deletions;
+          const status = c.new_file ? 'added' : c.deleted_file ? 'deleted' : c.renamed_file ? 'renamed' : 'modified';
+          return {
+            path: c.new_path || c.old_path || '',
+            additions: stats.additions,
+            deletions: stats.deletions,
+            status,
+            previousPath: c.renamed_file ? c.old_path : undefined,
+            patch,
+          };
+        });
+      }
+    } catch {
+      // Ignore
+    }
+  }
+
   return {
     number: item.iid as number,
     title: item.title as string,
@@ -102,10 +135,26 @@ export async function fetchGitLabPRDetail(
     comments: [],
     reviewers: [],
     labels: [],
-    additions: 0,
-    deletions: 0,
-    changedFiles: 0,
+    additions,
+    deletions,
+    changedFiles,
     commitsCount: commits.length,
     commits,
+    files,
   };
+}
+
+function parseDiffPatch(patch: string) {
+  let additions = 0;
+  let deletions = 0;
+  if (!patch) return { additions, deletions };
+  const lines = patch.split('\n');
+  for (const line of lines) {
+    if (line.startsWith('+') && !line.startsWith('+++')) {
+      additions++;
+    } else if (line.startsWith('-') && !line.startsWith('---')) {
+      deletions++;
+    }
+  }
+  return { additions, deletions };
 }

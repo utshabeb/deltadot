@@ -83,6 +83,10 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
   const [reviewError, setReviewError] = useState('');
   const [reviewDescriptionScroll, setReviewDescriptionScroll] = useState(0);
   const [reviewJiraCollapsed, setReviewJiraCollapsed] = useState(false);
+  const [reviewFocus, setReviewFocus] = useState<'description' | 'files'>('description');
+  const [reviewFileFocusIdx, setReviewFileFocusIdx] = useState(0);
+  const [reviewExpandedFiles, setReviewExpandedFiles] = useState<string[]>([]);
+  const [reviewFilesCollapsed, setReviewFilesCollapsed] = useState(false);
 
   // ── config editing state
   const [configDraft, setConfigDraft]   = useState<Record<ConfigField, string>>({
@@ -319,6 +323,10 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
     setReviewJira(null);
     setReviewDescriptionScroll(0);
     setReviewJiraCollapsed(false);
+    setReviewFocus('description');
+    setReviewFileFocusIdx(0);
+    setReviewExpandedFiles([]);
+    setReviewFilesCollapsed(false);
 
     try {
       const currentDetail = prDetailRef.current;
@@ -709,14 +717,63 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
     } else if (view === 'review') {
       if (input === ':') { setInputQuery(''); setInputMode('command'); return; }
       if (input === '/') { setInputQuery(''); setInputMode('search'); return; }
-      if (key.return || input === 'd') {
-        setReviewJiraCollapsed((c) => !c);
+      if (key.tab || key.leftArrow || key.rightArrow) {
+        setReviewFocus((f) => (f === 'description' ? 'files' : 'description'));
         return;
       }
-      if (key.upArrow || input === 'k') { setReviewDescriptionScroll((s) => Math.max(0, s - 1)); return; }
-      if (key.downArrow || input === 'j') { setReviewDescriptionScroll((s) => s + 1); return; }
-      if (key.pageUp) { setReviewDescriptionScroll((s) => Math.max(0, s - 8)); return; }
-      if (key.pageDown) { setReviewDescriptionScroll((s) => s + 8); return; }
+
+      const fileCount = prDetail?.files?.length ?? 0;
+
+      if (reviewFocus === 'description') {
+        if (key.return || input === 'd') {
+          setReviewJiraCollapsed((c) => !c);
+          return;
+        }
+        if (key.upArrow || input === 'k') { setReviewDescriptionScroll((s) => Math.max(0, s - 1)); return; }
+        if (key.downArrow || input === 'j') { setReviewDescriptionScroll((s) => s + 1); return; }
+        if (key.pageUp) { setReviewDescriptionScroll((s) => Math.max(0, s - 8)); return; }
+        if (key.pageDown) { setReviewDescriptionScroll((s) => s + 8); return; }
+      } else {
+        // files focus
+        if (input === 'd') {
+          setReviewFilesCollapsed((c) => !c);
+          return;
+        }
+        if (key.return || input === ' ') {
+          if (fileCount > 0) {
+            const filesList = prDetail?.files ?? [];
+            const focusedPath = filesList[reviewFileFocusIdx]?.path;
+            if (focusedPath) {
+              setReviewExpandedFiles((prev) => {
+                if (prev.includes(focusedPath)) {
+                  return prev.filter((p) => p !== focusedPath);
+                } else {
+                  return [...prev, focusedPath];
+                }
+              });
+            }
+          }
+          return;
+        }
+        if (key.upArrow || input === 'k') {
+          setReviewFileFocusIdx((idx) => Math.max(0, idx - 1));
+          return;
+        }
+        if (key.downArrow || input === 'j') {
+          setReviewFileFocusIdx((idx) => Math.min(Math.max(0, fileCount - 1), idx + 1));
+          return;
+        }
+        if (input === 'a') {
+          const allPaths = (prDetail?.files ?? []).map(f => f.path);
+          setReviewExpandedFiles(allPaths);
+          return;
+        }
+        if (input === 'A') {
+          setReviewExpandedFiles([]);
+          return;
+        }
+      }
+
       if (input === 'o' || input === 'O') {
         if (prDetail?.url) void openInBrowser(prDetail.url);
         return;
@@ -818,7 +875,21 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
           <PRDetailView pr={prDetail} loading={prDetailLoading} error={prDetailError} frame={frame} width={width} descriptionScroll={prDescriptionScroll} />
         )}
         {view === 'review' && (
-          <ReviewView pr={prDetail} jira={reviewJira} loading={reviewLoading || prDetailLoading} error={reviewError || prDetailError} frame={frame} width={width} descriptionScroll={reviewDescriptionScroll} collapsed={reviewJiraCollapsed} terminalHeight={height} />
+          <ReviewView
+            pr={prDetail}
+            jira={reviewJira}
+            loading={reviewLoading || prDetailLoading}
+            error={reviewError || prDetailError}
+            frame={frame}
+            width={width}
+            descriptionScroll={reviewDescriptionScroll}
+            collapsed={reviewJiraCollapsed}
+            terminalHeight={height}
+            reviewFocus={reviewFocus}
+            reviewFileFocusIdx={reviewFileFocusIdx}
+            reviewExpandedFiles={reviewExpandedFiles}
+            reviewFilesCollapsed={reviewFilesCollapsed}
+          />
         )}
       </Box>
 

@@ -15,6 +15,10 @@ export function ReviewView({
   descriptionScroll,
   collapsed,
   terminalHeight,
+  reviewFocus,
+  reviewFileFocusIdx,
+  reviewExpandedFiles,
+  reviewFilesCollapsed,
 }: {
   pr: PRDetail | null;
   jira: JiraIssue | null;
@@ -25,6 +29,10 @@ export function ReviewView({
   descriptionScroll: number;
   collapsed: boolean;
   terminalHeight: number;
+  reviewFocus: 'description' | 'files';
+  reviewFileFocusIdx: number;
+  reviewExpandedFiles: string[];
+  reviewFilesCollapsed: boolean;
 }) {
   const indent = 3;
 
@@ -101,7 +109,14 @@ export function ReviewView({
         </Box>
 
         <Box width={rightWidth} flexDirection="column">
-          <PRChanges pr={pr} width={rightWidth} />
+          <PRChanges
+            pr={pr}
+            width={rightWidth}
+            reviewFocus={reviewFocus}
+            reviewFileFocusIdx={reviewFileFocusIdx}
+            reviewExpandedFiles={reviewExpandedFiles}
+            reviewFilesCollapsed={reviewFilesCollapsed}
+          />
         </Box>
       </Box>
     </Box>

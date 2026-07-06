@@ -48,9 +48,13 @@ export async function fetchBitbucketPRDetail(owner, repo, prNumber, token) {
     const headers = bearerHeaders(token);
     const url = `https://api.bitbucket.org/2.0/repositories/${owner}/${repo}/pullrequests/${prNumber}`;
     const commitsUrl = `https://api.bitbucket.org/2.0/repositories/${owner}/${repo}/pullrequests/${prNumber}/commits`;
-    const [res, commitsRes] = await Promise.all([
+    const diffstatUrl = `https://api.bitbucket.org/2.0/repositories/${owner}/${repo}/pullrequests/${prNumber}/diffstat?limit=100`;
+    const diffUrl = `https://api.bitbucket.org/2.0/repositories/${owner}/${repo}/pullrequests/${prNumber}/diff`;
+    const [res, commitsRes, diffstatRes, diffRes] = await Promise.all([
         fetch(url, { headers }),
-        fetch(commitsUrl, { headers }).catch(() => null)
+        fetch(commitsUrl, { headers }).catch(() => null),
+        fetch(diffstatUrl, { headers }).catch(() => null),
+        fetch(diffUrl, { headers }).catch(() => null)
     ]);
     if (!res.ok) {
         const errorBody = await res.text();
@@ -68,6 +72,43 @@ export async function fetchBitbucketPRDetail(owner, repo, prNumber, token) {
                     author: c.author?.raw?.split(' <')[0] ?? c.author?.user?.display_name ?? '',
                     date: c.date ?? '',
                 }));
+            }
+        }
+        catch {
+            // Ignore
+        }
+    }
+    let files = [];
+    let additions = 0;
+    let deletions = 0;
+    let changedFiles = 0;
+    if (diffstatRes && diffstatRes.ok) {
+        try {
+            const diffstatData = await diffstatRes.json();
+            const values = diffstatData.values ?? [];
+            let patches = {};
+            if (diffRes && diffRes.ok) {
+                const diffText = await diffRes.text();
+                patches = parseBitbucketDiff(diffText);
+            }
+            if (Array.isArray(values)) {
+                changedFiles = values.length;
+                files = values.map((val) => {
+                    const path = val.new?.path ?? val.old?.path ?? '';
+                    const status = val.status === 'removed' ? 'deleted' : val.status === 'added' ? 'added' : val.status === 'renamed' ? 'renamed' : 'modified';
+                    const fileAdd = val.lines_added ?? 0;
+                    const fileDel = val.lines_removed ?? 0;
+                    additions += fileAdd;
+                    deletions += fileDel;
+                    return {
+                        path,
+                        additions: fileAdd,
+                        deletions: fileDel,
+                        status,
+                        previousPath: val.old?.path !== path ? val.old?.path : undefined,
+                        patch: patches[path],
+                    };
+                });
             }
         }
         catch {
@@ -93,11 +134,28 @@ export async function fetchBitbucketPRDetail(owner, repo, prNumber, token) {
         comments: [],
         reviewers: [],
         labels: [],
-        additions: 0,
-        deletions: 0,
-        changedFiles: 0,
+        additions,
+        deletions,
+        changedFiles,
         commitsCount: commits.length,
         commits,
+        files,
     };
+}
+function parseBitbucketDiff(diffText) {
+    const filePatches = {};
+    if (!diffText)
+        return filePatches;
+    const sections = diffText.split(/^diff --git /m);
+    for (const sec of sections) {
+        if (!sec.trim())
+            continue;
+        const match = sec.match(/^a\/(.+?)\s+b\/(.+?)(?:\n|$)/);
+        if (match && match[2]) {
+            const path = match[2].trim();
+            filePatches[path] = sec;
+        }
+    }
+    return filePatches;
 }
 //# sourceMappingURL=bitbucket.js.map
