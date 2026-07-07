@@ -89,6 +89,11 @@ export function resolveCliConfig(cliOpts: { path?: string; base?: string; releas
     jiraUrl:      savedCfg.jiraUrl      ?? '',
     jiraEmail:    savedCfg.jiraEmail    ?? '',
     jiraApiToken: savedCfg.jiraApiToken ?? '',
+    aiProvider:   (savedCfg.aiProvider  ?? 'none') as any,
+    aiApiKey:     savedCfg.aiApiKey     ?? '',
+    aiApiUrl:     savedCfg.aiApiUrl     ?? '',
+    aiModel:      savedCfg.aiModel      ?? 'gpt-4o',
+    aiSystemPrompt: savedCfg.aiSystemPrompt ?? 'You are a senior software engineer conducting a code review. Review the provided PR changes against the Jira ticket description. Focus on correctness, performance, edge cases, and code style. Provide concise, actionable feedback.',
   };
 
   if (!existsSync(finalCfg.workspace)) {

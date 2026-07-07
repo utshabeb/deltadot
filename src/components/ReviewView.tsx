@@ -19,6 +19,10 @@ export function ReviewView({
   reviewFileFocusIdx,
   reviewExpandedFiles,
   reviewFilesCollapsed,
+  reviewTab,
+  aiReviewLoading,
+  aiReviewError,
+  aiScroll,
 }: {
   pr: PRDetail | null;
   jira: JiraIssue | null;
@@ -33,6 +37,10 @@ export function ReviewView({
   reviewFileFocusIdx: number;
   reviewExpandedFiles: string[];
   reviewFilesCollapsed: boolean;
+  reviewTab: 'jira' | 'ai';
+  aiReviewLoading: boolean;
+  aiReviewError: string;
+  aiScroll: number;
 }) {
   const indent = 3;
 
@@ -105,6 +113,11 @@ export function ReviewView({
             collapsed={collapsed}
             terminalHeight={terminalHeight}
             width={leftWidth}
+            pr={pr}
+            reviewTab={reviewTab}
+            aiReviewLoading={aiReviewLoading}
+            aiReviewError={aiReviewError}
+            aiScroll={aiScroll}
           />
         </Box>
 

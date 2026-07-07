@@ -14,6 +14,11 @@ export interface AppConfig {
     jiraUrl: string;
     jiraEmail: string;
     jiraApiToken: string;
+    aiProvider: 'none' | 'openai' | 'anthropic' | 'gemini' | 'ollama' | 'openrouter';
+    aiApiKey: string;
+    aiApiUrl: string;
+    aiModel: string;
+    aiSystemPrompt: string;
 }
 export interface CommitEntry {
     hash: string;
@@ -55,6 +60,7 @@ export interface CacheFile {
     lastFullSync: string;
     repos: RepoState[];
     prs?: PR[];
+    aiReviews?: Record<string, string>;
 }
 export interface PR {
     number: number;
@@ -116,6 +122,7 @@ export interface PRDetail {
     commitsCount?: number;
     commits?: PRCommit[];
     files?: PRFile[];
+    aiReview?: string;
 }
 export interface PRFile {
     path: string;
@@ -135,8 +142,8 @@ export interface JiraIssue {
     reporter: string;
     url: string;
 }
-export type ConfigField = 'workspace' | 'base' | 'release' | 'syncInterval' | 'token' | 'provider' | 'taskProvider' | 'jiraUrl' | 'jiraEmail' | 'jiraApiToken';
+export type ConfigField = 'workspace' | 'base' | 'release' | 'syncInterval' | 'token' | 'provider' | 'taskProvider' | 'jiraUrl' | 'jiraEmail' | 'jiraApiToken' | 'aiProvider' | 'aiApiKey' | 'aiApiUrl' | 'aiModel' | 'aiSystemPrompt';
 export declare const CONFIG_FIELDS: ConfigField[];
-export declare function getVisibleConfigFields(taskProvider: TaskProvider): ConfigField[];
+export declare function getVisibleConfigFields(taskProvider: TaskProvider, aiProvider: string): ConfigField[];
 export declare const CONFIG_LABELS: Record<ConfigField, string>;
 //# sourceMappingURL=types.d.ts.map

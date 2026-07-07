@@ -7,8 +7,10 @@ import { getVisibleConfigFields } from './types.js';
 import { analyzeRepo, fetchCommitDetail } from './git.js';
 import { getRemoteUrl, getCommitUrl, getCompareUrl, openInBrowser } from './remote.js';
 import { getRemoteOwnerRepo, fetchPRs, fetchPRDetail } from './pr.js';
-import { findGitRepos, saveCache, saveGlobalConfig } from './config.js';
+import { findGitRepos, loadCache, saveCache, saveGlobalConfig } from './config.js';
 import { fetchJiraIssue, extractJiraIssueKey } from './services/tasks/jira.js';
+import { fetchAIReview } from './services/ai/review.js';
+import type { AIConfig } from './services/ai/review.js';
 import { TopBar } from './components/TopBar.js';
 import { BottomBar } from './components/BottomBar.js';
 import { CommandBar } from './components/CommandBar.js';
@@ -88,6 +90,13 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
   const [reviewExpandedFiles, setReviewExpandedFiles] = useState<string[]>([]);
   const [reviewFilesCollapsed, setReviewFilesCollapsed] = useState(false);
 
+  // ── AI review state
+  const [reviewTab, setReviewTab] = useState<'jira' | 'ai'>('jira');
+  const [aiReviewLoading, setAIReviewLoading] = useState(false);
+  const [aiReviewError, setAIReviewError] = useState('');
+  const [aiScroll, setAIScroll] = useState(0);
+  const aiReviewsRef = useRef<Record<string, string>>({});
+
   // ── config editing state
   const [configDraft, setConfigDraft]   = useState<Record<ConfigField, string>>({
     workspace:    initialConfig.workspace,
@@ -100,6 +109,11 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
     jiraUrl:      initialConfig.jiraUrl,
     jiraEmail:    initialConfig.jiraEmail,
     jiraApiToken: initialConfig.jiraApiToken,
+    aiProvider:   initialConfig.aiProvider,
+    aiApiKey:     initialConfig.aiApiKey,
+    aiApiUrl:     initialConfig.aiApiUrl,
+    aiModel:      initialConfig.aiModel,
+    aiSystemPrompt: initialConfig.aiSystemPrompt,
   });
   const [configFocus, setConfigFocus]   = useState<ConfigField>('workspace');
   const [configError, setConfigError]   = useState('');
@@ -117,7 +131,7 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
     .map((r) => r.name);
 
   const normalizedSearch = searchQuery.trim().toLowerCase();
-  const visibleConfigFields = getVisibleConfigFields((configDraft.taskProvider || 'none') as AppConfig['taskProvider']);
+  const visibleConfigFields = getVisibleConfigFields((configDraft.taskProvider || 'none') as AppConfig['taskProvider'], configDraft.aiProvider ?? 'none');
 
   const sortedPRs = [...prs].sort((a, b) => dateValue(b.createdAt) - dateValue(a.createdAt));
 
@@ -327,6 +341,17 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
     setReviewFileFocusIdx(0);
     setReviewExpandedFiles([]);
     setReviewFilesCollapsed(false);
+    setReviewTab('jira');
+    setAIReviewLoading(false);
+    setAIReviewError('');
+    setAIScroll(0);
+
+    // Load cached AI review
+    const repoName = repoPath.split('/').pop() ?? '';
+    const cacheKey = `${repoName}#${prNumber}`;
+    if (aiReviewsRef.current[cacheKey]) {
+      setPRDetail((prev) => prev ? { ...prev, aiReview: aiReviewsRef.current[cacheKey]! } : prev);
+    }
 
     try {
       const currentDetail = prDetailRef.current;
@@ -372,9 +397,62 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
     }
   }, [fetchPRDetailForRepo]);
 
+  const generateAIReview = useCallback(async (repoPath: string, prNumber: number, cacheKey: string) => {
+    setAIReviewLoading(true);
+    setAIReviewError('');
+
+    try {
+      const currentDetail = prDetailRef.current;
+      const detail = currentDetail?.number === prNumber ? currentDetail : await fetchPRDetailForRepo(repoPath, prNumber);
+      if (!detail) {
+        setAIReviewError('Unable to load PR details.');
+        return;
+      }
+
+      const aiCfg: AIConfig = {
+        provider: cfgRef.current.aiProvider,
+        apiKey: cfgRef.current.aiApiKey,
+        apiUrl: cfgRef.current.aiApiUrl,
+        model: cfgRef.current.aiModel,
+        systemPrompt: cfgRef.current.aiSystemPrompt,
+      };
+
+      const files = detail.files ?? [];
+      const jiraDesc = reviewJira?.description ?? '';
+
+      const review = await fetchAIReview(aiCfg, jiraDesc, files);
+      aiReviewsRef.current[cacheKey] = review;
+      setPRDetail((prev) => prev ? { ...prev, aiReview: review } : prev);
+
+      // Persist to cache
+      const { workspace, base, release } = cfgRef.current;
+      const existing = await import('./config.js').then(async (m) => m.loadCache(workspace));
+      const merged = {
+        workspace,
+        base,
+        release,
+        lastFullSync: existing?.lastFullSync ?? '',
+        repos: existing?.repos ?? [],
+        prs: existing?.prs ?? [],
+        aiReviews: { ...(existing?.aiReviews ?? {}), [cacheKey]: review },
+      };
+      await saveCache(merged);
+    } catch (err: unknown) {
+      setAIReviewError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAIReviewLoading(false);
+    }
+  }, [fetchPRDetailForRepo, reviewJira]);
+
   useEffect(() => {
     const fromCache = initialRepos.some((r) => r.status === 'stale');
     void runFullSync(findGitRepos(cfg.workspace), cfg.base, cfg.release, cfg.workspace, fromCache);
+    // Load cached AI reviews
+    void loadCache(cfg.workspace).then((cache) => {
+      if (cache?.aiReviews) {
+        aiReviewsRef.current = { ...cache.aiReviews };
+      }
+    });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -437,6 +515,15 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
       setConfigError('Jira URL, email, and API token are required when Jira is enabled');
       return;
     }
+    const aiProvider = (configDraft.aiProvider ?? 'none').trim();
+    if (!['none', 'openai', 'anthropic', 'gemini', 'ollama', 'openrouter'].includes(aiProvider)) {
+      setConfigError('AI provider must be none, openai, anthropic, gemini, ollama, or openrouter');
+      return;
+    }
+    if (aiProvider !== 'none' && aiProvider !== 'ollama' && !configDraft.aiApiKey?.trim()) {
+      setConfigError('AI API key is required when AI provider is enabled');
+      return;
+    }
     const newCfg: AppConfig = {
       workspace: resolvedWs,
       base: base.trim(),
@@ -448,6 +535,11 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
       jiraUrl: configDraft.jiraUrl ?? '',
       jiraEmail: configDraft.jiraEmail ?? '',
       jiraApiToken: configDraft.jiraApiToken ?? '',
+      aiProvider: aiProvider as AppConfig['aiProvider'],
+      aiApiKey: configDraft.aiApiKey ?? '',
+      aiApiUrl: configDraft.aiApiUrl ?? '',
+      aiModel: configDraft.aiModel ?? 'gpt-4o',
+      aiSystemPrompt: configDraft.aiSystemPrompt ?? 'You are a senior software engineer conducting a code review.',
     };
     setCfg(newCfg);
     cfgRef.current = newCfg;
@@ -470,7 +562,7 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
   const execCommand = useCallback((cmd: string) => {
     const trimmed = cmd.trim().toLowerCase();
     if (!trimmed || trimmed === 'list') { setView('list'); return true; }
-    if (trimmed === 'config') { setConfigDraft({ workspace: cfgRef.current.workspace, base: cfgRef.current.base, release: cfgRef.current.release, syncInterval: String(cfgRef.current.syncInterval), token: cfgRef.current.token, provider: cfgRef.current.provider, taskProvider: cfgRef.current.taskProvider, jiraUrl: cfgRef.current.jiraUrl, jiraEmail: cfgRef.current.jiraEmail, jiraApiToken: cfgRef.current.jiraApiToken }); setConfigFocus('workspace'); setConfigError(''); setView('config'); return true; }
+      if (trimmed === 'config') { setConfigDraft({ workspace: cfgRef.current.workspace, base: cfgRef.current.base, release: cfgRef.current.release, syncInterval: String(cfgRef.current.syncInterval), token: cfgRef.current.token, provider: cfgRef.current.provider, taskProvider: cfgRef.current.taskProvider, jiraUrl: cfgRef.current.jiraUrl, jiraEmail: cfgRef.current.jiraEmail, jiraApiToken: cfgRef.current.jiraApiToken, aiProvider: cfgRef.current.aiProvider, aiApiKey: cfgRef.current.aiApiKey, aiApiUrl: cfgRef.current.aiApiUrl, aiModel: cfgRef.current.aiModel, aiSystemPrompt: cfgRef.current.aiSystemPrompt }); setConfigFocus('workspace'); setConfigError(''); setView('config'); return true; }
     if (trimmed === 'prs') { setView('prs'); return true; }
     if (trimmed === 'commits') { setView('commits'); return true; }
     if (trimmed === 'sync') { const c = cfgRef.current; const paths = findGitRepos(c.workspace); void runFullSync(paths, c.base, c.release, c.workspace, false); return true; }
@@ -589,7 +681,7 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
       if (input === 'c') { setSelectedCommit(0); setView('commits'); return; }
       if (input === 's') { void runSingleSync(selectedRepo); return; }
       if (input === 'e') {
-        setConfigDraft({ workspace: cfgRef.current.workspace, base: cfgRef.current.base, release: cfgRef.current.release, syncInterval: String(cfgRef.current.syncInterval), token: cfgRef.current.token, provider: cfgRef.current.provider, taskProvider: cfgRef.current.taskProvider, jiraUrl: cfgRef.current.jiraUrl, jiraEmail: cfgRef.current.jiraEmail, jiraApiToken: cfgRef.current.jiraApiToken });
+        setConfigDraft({ workspace: cfgRef.current.workspace, base: cfgRef.current.base, release: cfgRef.current.release, syncInterval: String(cfgRef.current.syncInterval), token: cfgRef.current.token, provider: cfgRef.current.provider, taskProvider: cfgRef.current.taskProvider, jiraUrl: cfgRef.current.jiraUrl, jiraEmail: cfgRef.current.jiraEmail, jiraApiToken: cfgRef.current.jiraApiToken, aiProvider: cfgRef.current.aiProvider, aiApiKey: cfgRef.current.aiApiKey, aiApiUrl: cfgRef.current.aiApiUrl, aiModel: cfgRef.current.aiModel, aiSystemPrompt: cfgRef.current.aiSystemPrompt });
         setConfigFocus('workspace');
         setConfigError('');
         setView('config');
@@ -718,21 +810,47 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
       if (input === ':') { setInputQuery(''); setInputMode('command'); return; }
       if (input === '/') { setInputQuery(''); setInputMode('search'); return; }
       if (key.tab || key.leftArrow || key.rightArrow) {
-        setReviewFocus((f) => (f === 'description' ? 'files' : 'description'));
+        if (reviewFocus === 'files') {
+          // from files: cycle back to description
+          setReviewFocus('description');
+        } else {
+          // from description: go to files (Tab cycles desciption ↔ files)
+          setReviewFocus('files');
+        }
+        return;
+      }
+      if (input === 't') {
+        setReviewTab((tab) => (tab === 'jira' ? 'ai' : 'jira'));
+        return;
+      }
+      if (input === 'r' && reviewTab === 'ai') {
+        const repo = repos.find((r) => r.path === reviewContext.repoPath) ?? repos[selectedRepo];
+        const pr = prDetailRef.current;
+        if (!repo || !pr) return;
+        const cacheKey = `${repo.name}#${pr.number}`;
+        void generateAIReview(repo.path, pr.number, cacheKey);
         return;
       }
 
       const fileCount = prDetail?.files?.length ?? 0;
 
       if (reviewFocus === 'description') {
-        if (key.return || input === 'd') {
-          setReviewJiraCollapsed((c) => !c);
-          return;
+        if (reviewTab === 'jira') {
+          if (key.return || input === 'd') {
+            setReviewJiraCollapsed((c) => !c);
+            return;
+          }
+          if (key.upArrow || input === 'k') { setReviewDescriptionScroll((s) => Math.max(0, s - 1)); return; }
+          if (key.downArrow || input === 'j') { setReviewDescriptionScroll((s) => s + 1); return; }
+          if (key.pageUp) { setReviewDescriptionScroll((s) => Math.max(0, s - 8)); return; }
+          if (key.pageDown) { setReviewDescriptionScroll((s) => s + 8); return; }
+        } else {
+          // AI review tab scrolling
+          if (key.upArrow || input === 'k') { setAIScroll((s) => Math.max(0, s - 1)); return; }
+          if (key.downArrow || input === 'j') { setAIScroll((s) => s + 1); return; }
+          if (key.pageUp) { setAIScroll((s) => Math.max(0, s - 8)); return; }
+          if (key.pageDown) { setAIScroll((s) => s + 8); return; }
         }
-        if (key.upArrow || input === 'k') { setReviewDescriptionScroll((s) => Math.max(0, s - 1)); return; }
-        if (key.downArrow || input === 'j') { setReviewDescriptionScroll((s) => s + 1); return; }
-        if (key.pageUp) { setReviewDescriptionScroll((s) => Math.max(0, s - 8)); return; }
-        if (key.pageDown) { setReviewDescriptionScroll((s) => s + 8); return; }
       } else {
         // files focus
         if (input === 'd') {
@@ -889,6 +1007,10 @@ export function Dashboard({ initialConfig, initialRepos, initialLastSync, initia
             reviewFileFocusIdx={reviewFileFocusIdx}
             reviewExpandedFiles={reviewExpandedFiles}
             reviewFilesCollapsed={reviewFilesCollapsed}
+            reviewTab={reviewTab}
+            aiReviewLoading={aiReviewLoading}
+            aiReviewError={aiReviewError}
+            aiScroll={aiScroll}
           />
         )}
       </Box>

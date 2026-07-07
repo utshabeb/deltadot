@@ -1,9 +1,74 @@
 import React from 'react';
 import { Box, Text } from 'ink';
-import type { JiraIssue } from '../types.js';
-import { pad } from '../utils.js';
+import type { JiraIssue, PRDetail } from '../types.js';
+import { SPINNER, pad } from '../utils.js';
 
 export function JiraDescription({
+  jira,
+  descriptionScroll,
+  collapsed,
+  terminalHeight,
+  width,
+  pr,
+  reviewTab,
+  aiReviewLoading,
+  aiReviewError,
+  aiScroll,
+}: {
+  jira: JiraIssue | null;
+  descriptionScroll: number;
+  collapsed: boolean;
+  terminalHeight: number;
+  width: number;
+  pr: PRDetail | null;
+  reviewTab: 'jira' | 'ai';
+  aiReviewLoading: boolean;
+  aiReviewError: string;
+  aiScroll: number;
+}) {
+  const tabW = Math.floor((width - 4) / 2);
+
+  return (
+    <Box flexDirection="column">
+      {/* Tab bar */}
+      <Box>
+        <Box width={tabW} paddingLeft={1}>
+          <Text bold color={reviewTab === 'jira' ? 'white' : 'dimColor'}>
+            {reviewTab === 'jira' ? '■' : ' '}
+            {' '}Jira Task
+          </Text>
+        </Box>
+        <Box width={tabW}>
+          <Text bold color={reviewTab === 'ai' ? 'white' : 'dimColor'}>
+            {reviewTab === 'ai' ? '■' : ' '}
+            {' '}AI Code Review
+          </Text>
+        </Box>
+      </Box>
+
+      {reviewTab === 'jira' ? (
+        <JiraTabContent
+          jira={jira}
+          descriptionScroll={descriptionScroll}
+          collapsed={collapsed}
+          terminalHeight={terminalHeight}
+          width={width}
+        />
+      ) : (
+        <AITabContent
+          pr={pr}
+          loading={aiReviewLoading}
+          error={aiReviewError}
+          aiScroll={aiScroll}
+          terminalHeight={terminalHeight}
+          width={width}
+        />
+      )}
+    </Box>
+  );
+}
+
+function JiraTabContent({
   jira,
   descriptionScroll,
   collapsed,
@@ -27,7 +92,7 @@ export function JiraDescription({
   const descTitle = collapsed ? '+Description' : `-Description${progressText}`;
 
   return (
-    <Box flexDirection="column">
+    <>
       <Section title="Jira Task">
         {jira ? (
           <>
@@ -57,6 +122,72 @@ export function JiraDescription({
           )}
         </Box>
       ) : null}
+    </>
+  );
+}
+
+function AITabContent({
+  pr,
+  loading,
+  error,
+  aiScroll,
+  terminalHeight,
+  width,
+}: {
+  pr: PRDetail | null;
+  loading: boolean;
+  error: string;
+  aiScroll: number;
+  terminalHeight: number;
+  width: number;
+}) {
+  if (loading) {
+    const spin = SPINNER[0]!;
+    return (
+      <Box paddingTop={1}>
+        <Text color="cyanBright">{spin}</Text>
+        <Text>  </Text>
+        <Text color="yellowBright">Generating AI review…</Text>
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box paddingTop={1}>
+        <Text color="redBright">⚠ {error}</Text>
+      </Box>
+    );
+  }
+
+  const reviewText = pr?.aiReview;
+
+  if (!reviewText) {
+    return (
+      <Box paddingTop={1}>
+        <Text dimColor>Press 'r' to generate an AI code review.</Text>
+      </Box>
+    );
+  }
+
+  const lines = wrapText(reviewText, Math.max(20, width - 2));
+  const viewport = Math.max(6, terminalHeight - 14);
+  const maxScroll = Math.max(0, lines.length - viewport);
+  const clampedScroll = Math.min(aiScroll, maxScroll);
+  const visible = lines.slice(clampedScroll, clampedScroll + viewport);
+  const showProgress = lines.length > viewport;
+  const progressText = showProgress ? ` [${clampedScroll + 1}/${maxScroll + 1}]` : '';
+
+  return (
+    <Box flexDirection="column" paddingTop={1}>
+      <Box>
+        <Text color="whiteBright" bold>AI Code Review{progressText}</Text>
+      </Box>
+      <Box flexDirection="column">
+        {visible.map((line, i) => (
+          <Text key={`${clampedScroll}-${i}`} color="white" wrap="wrap">{line || ' '}</Text>
+        ))}
+      </Box>
     </Box>
   );
 }

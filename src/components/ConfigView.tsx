@@ -20,6 +20,7 @@ export function ConfigView({
   const indent = 3;
   const labelW = 22;
   const taskProvider = (draft.taskProvider || 'none') as AppConfig['taskProvider'];
+  const aiProvider = (draft.aiProvider || 'none') as AppConfig['aiProvider'];
 
   const renderField = (field: ConfigField, labelWidth = labelW) => {
     const isFocused = field === focusedField;
@@ -71,6 +72,18 @@ export function ConfigView({
           {renderField('jiraUrl', 16)}
           {renderField('jiraEmail', 16)}
           {renderField('jiraApiToken', 16)}
+        </>
+      )}
+      <Box paddingLeft={indent} marginTop={1}>
+        <Text color="whiteBright" bold>AI Code Review</Text>
+      </Box>
+      {renderField('aiProvider')}
+      {aiProvider !== 'none' && (
+        <>
+          {renderField('aiApiKey', 16)}
+          {renderField('aiApiUrl', 16)}
+          {renderField('aiModel', 16)}
+          {renderField('aiSystemPrompt', 16)}
         </>
       )}
       {validationError && (

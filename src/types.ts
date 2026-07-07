@@ -17,6 +17,11 @@ export interface AppConfig {
   jiraUrl: string;
   jiraEmail: string;
   jiraApiToken: string;
+  aiProvider: 'none' | 'openai' | 'anthropic' | 'gemini' | 'ollama' | 'openrouter';
+  aiApiKey: string;
+  aiApiUrl: string;
+  aiModel: string;
+  aiSystemPrompt: string;
 }
 
 export interface CommitEntry {
@@ -63,6 +68,7 @@ export interface CacheFile {
   lastFullSync: string;
   repos: RepoState[];
   prs?: PR[];
+  aiReviews?: Record<string, string>;
 }
 
 export interface PR {
@@ -130,6 +136,7 @@ export interface PRDetail {
   commitsCount?: number;
   commits?: PRCommit[];
   files?: PRFile[];
+  aiReview?: string;
 }
 
 export interface PRFile {
@@ -152,14 +159,20 @@ export interface JiraIssue {
   url: string;
 }
 
-export type ConfigField = 'workspace' | 'base' | 'release' | 'syncInterval' | 'token' | 'provider' | 'taskProvider' | 'jiraUrl' | 'jiraEmail' | 'jiraApiToken';
+export type ConfigField = 'workspace' | 'base' | 'release' | 'syncInterval' | 'token' | 'provider' | 'taskProvider' | 'jiraUrl' | 'jiraEmail' | 'jiraApiToken' | 'aiProvider' | 'aiApiKey' | 'aiApiUrl' | 'aiModel' | 'aiSystemPrompt';
 
-export const CONFIG_FIELDS: ConfigField[] = ['workspace', 'base', 'release', 'syncInterval', 'token', 'provider', 'taskProvider', 'jiraUrl', 'jiraEmail', 'jiraApiToken'];
+export const CONFIG_FIELDS: ConfigField[] = ['workspace', 'base', 'release', 'syncInterval', 'token', 'provider', 'taskProvider', 'jiraUrl', 'jiraEmail', 'jiraApiToken', 'aiProvider', 'aiApiKey', 'aiApiUrl', 'aiModel', 'aiSystemPrompt'];
 
-export function getVisibleConfigFields(taskProvider: TaskProvider): ConfigField[] {
-  return taskProvider === 'jira'
-    ? ['workspace', 'base', 'release', 'syncInterval', 'token', 'provider', 'taskProvider', 'jiraUrl', 'jiraEmail', 'jiraApiToken']
-    : ['workspace', 'base', 'release', 'syncInterval', 'token', 'provider', 'taskProvider'];
+export function getVisibleConfigFields(taskProvider: TaskProvider, aiProvider: string): ConfigField[] {
+  const fields: ConfigField[] = ['workspace', 'base', 'release', 'syncInterval', 'token', 'provider', 'taskProvider'];
+  if (taskProvider === 'jira') {
+    fields.push('jiraUrl', 'jiraEmail', 'jiraApiToken');
+  }
+  fields.push('aiProvider');
+  if (aiProvider && aiProvider !== 'none') {
+    fields.push('aiApiKey', 'aiApiUrl', 'aiModel', 'aiSystemPrompt');
+  }
+  return fields;
 }
 
 export const CONFIG_LABELS: Record<ConfigField, string> = {
@@ -173,4 +186,9 @@ export const CONFIG_LABELS: Record<ConfigField, string> = {
   jiraUrl:      'Jira URL',
   jiraEmail:    'Jira Email',
   jiraApiToken: 'Jira API Token',
+  aiProvider:     'AI Provider',
+  aiApiKey:       'AI API Key',
+  aiApiUrl:       'AI API URL',
+  aiModel:        'AI Model',
+  aiSystemPrompt: 'AI System Prompt',
 };
